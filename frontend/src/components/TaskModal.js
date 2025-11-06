@@ -10,7 +10,9 @@ import {
 const TaskModal = ({ task, projectId, onClose, onDelete, onUpdate }) => {
   const dispatch = useDispatch();
   const { currentProject } = useSelector((state) => state.projects);
+  const { user } = useSelector((state) => state.auth);
 
+  const isOwner = currentProject?.owner?._id === user.id;
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({
     title: task.title,
@@ -179,6 +181,9 @@ const TaskModal = ({ task, projectId, onClose, onDelete, onUpdate }) => {
           <div className="flex gap-2">
             {!isEditing ? (
               <>
+               {/* ONLY SHOW EDIT/DELETE FOR OWNER */}
+        {isOwner && (
+            <>
                 <button
                   onClick={() => setIsEditing(true)}
                   className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
@@ -192,6 +197,8 @@ const TaskModal = ({ task, projectId, onClose, onDelete, onUpdate }) => {
                   Delete Task
                 </button>
               </>
+               )}
+            </>
             ) : (
               <>
                 <button
@@ -234,6 +241,7 @@ const TaskModal = ({ task, projectId, onClose, onDelete, onUpdate }) => {
                 rows="4"
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 placeholder="Add task description"
+                readOnly={!isOwner || !isEditing}
               />
             ) : (
               <p className="text-gray-700 whitespace-pre-wrap">
@@ -255,6 +263,7 @@ const TaskModal = ({ task, projectId, onClose, onDelete, onUpdate }) => {
                   value={formData.status}
                   onChange={handleChange}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  disabled={!isOwner || !isEditing}
                 >
                   <option value="todo">To Do</option>
                   <option value="in_progress">In Progress</option>
@@ -327,6 +336,7 @@ const TaskModal = ({ task, projectId, onClose, onDelete, onUpdate }) => {
                   value={formData.deadline}
                   onChange={handleChange}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  readOnly={!isOwner || !isEditing}
                 />
               ) : (
                 <p className={`text-gray-700 ${isOverdue ? 'text-red-600 font-semibold' : ''}`}>
@@ -351,6 +361,7 @@ const TaskModal = ({ task, projectId, onClose, onDelete, onUpdate }) => {
                   min="0"
                   step="0.5"
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  readOnly={!isOwner || !isEditing}
                 />
               ) : (
                 <p className="text-gray-700">
@@ -372,6 +383,7 @@ const TaskModal = ({ task, projectId, onClose, onDelete, onUpdate }) => {
                   onChange={handleChange}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                   placeholder="bug, feature, urgent"
+                  readOnly={!isOwner || !isEditing}
                 />
               ) : task.labels && task.labels.length > 0 ? (
                 <div className="flex flex-wrap gap-1">
@@ -398,6 +410,7 @@ const TaskModal = ({ task, projectId, onClose, onDelete, onUpdate }) => {
             </h3>
 
             {/* Add Subtask Form */}
+        {isOwner && isEditing && (
             <form onSubmit={handleAddSubtask} className="flex gap-2 mb-3">
               <input
                 type="text"
@@ -413,7 +426,7 @@ const TaskModal = ({ task, projectId, onClose, onDelete, onUpdate }) => {
                 Add
               </button>
             </form>
-
+        )}
             {/* Subtask List */}
             <div className="space-y-2">
               {task.subtasks && task.subtasks.length > 0 ? (
@@ -440,6 +453,7 @@ const TaskModal = ({ task, projectId, onClose, onDelete, onUpdate }) => {
                     <button
                       onClick={() => handleDeleteSubtask(subtask._id)}
                       className="text-red-600 hover:text-red-700 text-sm"
+                      disabled={!isOwner}
                     >
                       Delete
                     </button>

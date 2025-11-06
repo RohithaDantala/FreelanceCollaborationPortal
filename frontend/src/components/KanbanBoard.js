@@ -15,7 +15,9 @@ import CreateTaskModal from './CreateTaskModal';
 const KanbanBoard = ({ projectId }) => {
   const dispatch = useDispatch();
   const { groupedTasks, isLoading } = useSelector((state) => state.tasks);
-
+  const { user } = useSelector((state) => state.auth);
+  const { currentProject } = useSelector((state) => state.projects);
+    const isOwner = currentProject?.owner?._id === user.id;
   const [draggedTask, setDraggedTask] = useState(null);
   const [draggedOverColumn, setDraggedOverColumn] = useState(null);
   const [showTaskModal, setShowTaskModal] = useState(false);
@@ -157,19 +159,22 @@ const KanbanBoard = ({ projectId }) => {
           >
             {/* Column Header */}
             <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2">
                 <h3 className="font-semibold text-gray-800">{column.title}</h3>
                 <span className="px-2 py-1 bg-gray-200 text-gray-600 text-xs rounded-full">
-                  {groupedTasks[column.id]?.length || 0}
+                    {groupedTasks[column.id]?.length || 0}
                 </span>
-              </div>
-              <button
-                onClick={() => handleCreateTask(column.id)}
-                className="text-gray-400 hover:text-gray-600 text-xl"
-                title="Add task"
-              >
-                +
-              </button>
+                </div>
+                {/* ONLY SHOW FOR OWNER */}
+                {isOwner && (
+                <button
+                    onClick={() => handleCreateTask(column.id)}
+                    className="text-gray-400 hover:text-gray-600 text-xl"
+                    title="Add task"
+                >
+                    +
+                </button>
+                )}
             </div>
 
             {/* Drop Zone Indicator */}
@@ -188,6 +193,7 @@ const KanbanBoard = ({ projectId }) => {
                   onDragStart={handleDragStart}
                   onClick={handleTaskClick}
                   getPriorityColor={getPriorityColor}
+                canDrag={isOwner} 
                 />
               ))}
 

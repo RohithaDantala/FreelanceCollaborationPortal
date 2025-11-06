@@ -32,9 +32,8 @@ const ProjectDetail = () => {
     };
   }, [dispatch, id]);
 
-  const isOwner = user && project && project.owner._id === user.id;
-  const isMember = user && project && project.members?.some((m) => m.user._id === user.id);
-  const hasApplied = user && project && project.applicants?.some((a) => a.user._id === user.id);
+const isOwner = user && project?.owner?._id === user.id;
+const isMember = user && project?.members?.some((m) => m.user?._id === user.id);
 
   const handleApply = () => {
     if (!applicationMessage.trim()) {
@@ -46,11 +45,59 @@ const ProjectDetail = () => {
     setApplicationMessage('');
   };
 
-  const handleAcceptReject = (applicantId, status) => {
-    if (window.confirm(`Are you sure you want to ${status} this application?`)) {
-      dispatch(handleApplication({ projectId: project._id, applicantId, status }));
+// frontend/src/pages/ProjectDetail.js
+
+// Update the handleAcceptReject function:
+const handleAcceptReject = async (applicantId, status) => {
+  if (window.confirm(`Are you sure you want to ${status} this application?`)) {
+    try {
+      await dispatch(handleApplication({ projectId: project._id, applicantId, status })).unwrap();
+      // IMPORTANT: Refresh the project data
+      await dispatch(getProject(project._id));
+    } catch (error) {
+      alert('Failed to handle application');
     }
-  };
+  }
+};
+
+// Update the hasApplied check to be more accurate:
+const hasApplied = user && project?.applicants?.some(
+  (a) => a.user?._id === user.id || a.user === user.id
+);
+
+const myApplication = user && project?.applicants?.find(
+  (a) => a.user?._id === user.id || a.user === user.id
+);
+
+const applicationStatus = myApplication?.status;
+
+// Then in the UI, replace the simple hasApplied check:
+{!isOwner && !isMember && !myApplication && project?.status === 'open' && (
+  <button
+    onClick={() => setShowApplicationModal(true)}
+    className="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+  >
+    Apply to Join
+  </button>
+)}
+
+{myApplication && applicationStatus === 'pending' && (
+  <span className="px-6 py-2 bg-yellow-100 text-yellow-800 rounded-lg">
+    Application Pending
+  </span>
+)}
+
+{myApplication && applicationStatus === 'accepted' && !isMember && (
+  <span className="px-6 py-2 bg-green-100 text-green-800 rounded-lg">
+    Application Accepted ✓
+  </span>
+)}
+
+{myApplication && applicationStatus === 'rejected' && (
+  <span className="px-6 py-2 bg-red-100 text-red-800 rounded-lg">
+    Application Rejected
+  </span>
+)}
 
   const handleRemoveMember = (memberId) => {
     if (window.confirm('Are you sure you want to remove this member?')) {
@@ -131,10 +178,10 @@ const ProjectDetail = () => {
                   <h1 className="text-3xl font-bold text-gray-800">{project.title}</h1>
                   <span
                     className={`px-3 py-1 text-sm font-medium rounded-full ${getStatusBadge(
-                      project.status
+                      project?.status
                     )}`}
                   >
-                    {project.status.replace('_', ' ')}
+                    {project?.status.replace('_', ' ')}
                   </span>
                 </div>
                 <p className="text-gray-600 capitalize">{getCategoryLabel(project.category)}</p>

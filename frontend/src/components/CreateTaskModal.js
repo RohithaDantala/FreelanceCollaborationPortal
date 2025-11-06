@@ -5,7 +5,11 @@ import { createTask } from '../redux/slices/taskSlice';
 const CreateTaskModal = ({ projectId, initialStatus, onClose, onSuccess }) => {
   const dispatch = useDispatch();
   const { currentProject } = useSelector((state) => state.projects);
-
+  const { user } = useSelector((state) => state.auth);
+  const isOwner = currentProject?.owner?._id === user.id;
+    if (!isOwner) {
+    return null;
+  }
   const [formData, setFormData] = useState({
     title: '',
     description: '',

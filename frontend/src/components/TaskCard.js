@@ -1,6 +1,6 @@
 import React from 'react';
 
-const TaskCard = ({ task, onDragStart, onClick, getPriorityColor }) => {
+const TaskCard = ({ task, onDragStart, onClick, getPriorityColor , canDrag = true}) => {
   const isOverdue = task.deadline && new Date(task.deadline) < new Date() && task.status !== 'done';
   
   const getSubtasksProgress = () => {
@@ -15,7 +15,7 @@ const TaskCard = ({ task, onDragStart, onClick, getPriorityColor }) => {
 
   return (
     <div
-      draggable
+      draggable={canDrag}
       onDragStart={(e) => onDragStart(e, task)}
       onClick={() => onClick(task)}
       className="bg-white rounded-lg p-3 shadow-sm hover:shadow-md transition-shadow cursor-pointer border border-gray-200"
