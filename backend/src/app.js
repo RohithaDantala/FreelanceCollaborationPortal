@@ -46,6 +46,7 @@ try {
   app.use('/api', require('./routes/taskRoutes')); // Task routes
   app.use('/api', require('./routes/fileRoutes')); // File routes
   app.use('/api/notifications', require('./routes/notificationRoutes')); // Notification routes
+  app.use('/api', require('./routes/milestoneRoutes'));
 } catch (error) {
   console.warn('⚠️ Some routes not found — create them under src/routes/');
 }

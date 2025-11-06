@@ -15,6 +15,8 @@ import ProjectDetail from './pages/ProjectDetail';
 import MyProjects from './pages/MyProjects';
 import ProjectTasks from './pages/ProjectTasks';
 import ProjectFiles from './pages/ProjectFiles';
+import ProjectMilestones from './pages/ProjectMilestones';
+
 import PrivateRoute from './components/PrivateRoute';
 import OwnerRoute from './components/OwnerRoute';
 
