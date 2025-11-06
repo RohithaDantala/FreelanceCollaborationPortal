@@ -13,6 +13,7 @@ import CreateProject from './pages/CreateProject';
 import BrowseProjects from './pages/BrowseProjects';
 import ProjectDetail from './pages/ProjectDetail';
 import MyProjects from './pages/MyProjects';
+import ProjectTasks from './pages/ProjectTasks'; // NEW
 import PrivateRoute from './components/PrivateRoute';
 
 function App() {
@@ -79,6 +80,14 @@ function App() {
               element={
                 <PrivateRoute>
                   <MyProjects />
+                </PrivateRoute>
+              } 
+            />
+            <Route 
+              path="/projects/:id/tasks" 
+              element={
+                <PrivateRoute>
+                  <ProjectTasks />
                 </PrivateRoute>
               } 
             />

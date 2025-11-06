@@ -38,12 +38,14 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// ✅ Add your API routes here
+// API routes
 try {
   app.use('/api/auth', require('./routes/authRoutes'));
   app.use('/api/users', require('./routes/userRoutes'));
+  app.use('/api/projects', require('./routes/projectRoutes'));
+  app.use('/api', require('./routes/taskRoutes')); // Task routes
 } catch (error) {
-  console.warn('⚠️ Routes not found yet — create them under src/routes/');
+  console.warn('⚠️ Some routes not found — create them under src/routes/');
 }
 
 // 404 handler - must be after all routes
