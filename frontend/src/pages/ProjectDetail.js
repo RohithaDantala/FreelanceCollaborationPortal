@@ -32,76 +32,61 @@ const ProjectDetail = () => {
     };
   }, [dispatch, id]);
 
-const isOwner = user && project?.owner?._id === user.id;
-const isMember = user && project?.members?.some((m) => m.user?._id === user.id);
+  // Refresh project data when operations complete
+  useEffect(() => {
+    if (isSuccess && message) {
+      dispatch(getProject(id));
+    }
+  }, [isSuccess, message, id, dispatch]);
 
-  const handleApply = () => {
+  const isOwner = user && project?.owner?._id === user.id;
+  const isMember = user && project?.members?.some((m) => m.user?._id === user.id);
+
+  // Check application status more accurately
+  const myApplication = user && project?.applicants?.find(
+    (a) => (a.user?._id === user.id || a.user === user.id)
+  );
+  
+  const applicationStatus = myApplication?.status;
+
+  const handleApply = async () => {
     if (!applicationMessage.trim()) {
       alert('Please write a message explaining why you want to join');
       return;
     }
-    dispatch(applyToProject({ id: project._id, message: applicationMessage }));
-    setShowApplicationModal(false);
-    setApplicationMessage('');
+    try {
+      await dispatch(applyToProject({ id: project._id, message: applicationMessage })).unwrap();
+      setShowApplicationModal(false);
+      setApplicationMessage('');
+      // Refresh project to get updated applicants
+      dispatch(getProject(id));
+    } catch (error) {
+      alert(error || 'Failed to submit application');
+    }
   };
 
-// frontend/src/pages/ProjectDetail.js
-
-// Update the handleAcceptReject function:
-const handleAcceptReject = async (applicantId, status) => {
-  if (window.confirm(`Are you sure you want to ${status} this application?`)) {
-    try {
-      await dispatch(handleApplication({ projectId: project._id, applicantId, status })).unwrap();
-      // IMPORTANT: Refresh the project data
-      await dispatch(getProject(project._id));
-    } catch (error) {
-      alert('Failed to handle application');
+  const handleAcceptReject = async (applicantId, status) => {
+    const action = status === 'accepted' ? 'accept' : 'reject';
+    if (window.confirm(`Are you sure you want to ${action} this application?`)) {
+      try {
+        await dispatch(handleApplication({ projectId: project._id, applicantId, status })).unwrap();
+        // Force refresh to get updated data
+        await dispatch(getProject(project._id));
+      } catch (error) {
+        alert('Failed to handle application');
+      }
     }
-  }
-};
+  };
 
-// Update the hasApplied check to be more accurate:
-const hasApplied = user && project?.applicants?.some(
-  (a) => a.user?._id === user.id || a.user === user.id
-);
-
-const myApplication = user && project?.applicants?.find(
-  (a) => a.user?._id === user.id || a.user === user.id
-);
-
-const applicationStatus = myApplication?.status;
-
-// Then in the UI, replace the simple hasApplied check:
-{!isOwner && !isMember && !myApplication && project?.status === 'open' && (
-  <button
-    onClick={() => setShowApplicationModal(true)}
-    className="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
-  >
-    Apply to Join
-  </button>
-)}
-
-{myApplication && applicationStatus === 'pending' && (
-  <span className="px-6 py-2 bg-yellow-100 text-yellow-800 rounded-lg">
-    Application Pending
-  </span>
-)}
-
-{myApplication && applicationStatus === 'accepted' && !isMember && (
-  <span className="px-6 py-2 bg-green-100 text-green-800 rounded-lg">
-    Application Accepted ✓
-  </span>
-)}
-
-{myApplication && applicationStatus === 'rejected' && (
-  <span className="px-6 py-2 bg-red-100 text-red-800 rounded-lg">
-    Application Rejected
-  </span>
-)}
-
-  const handleRemoveMember = (memberId) => {
+  const handleRemoveMember = async (memberId) => {
     if (window.confirm('Are you sure you want to remove this member?')) {
-      dispatch(removeMember({ projectId: project._id, memberId }));
+      try {
+        await dispatch(removeMember({ projectId: project._id, memberId })).unwrap();
+        // Refresh project
+        dispatch(getProject(project._id));
+      } catch (error) {
+        alert('Failed to remove member');
+      }
     }
   };
 
@@ -189,7 +174,7 @@ const applicationStatus = myApplication?.status;
 
               {/* Action Buttons */}
               <div className="flex gap-2">
-                {/* Tasks button for all members (including owner) */}
+                {/* Tasks button for all members */}
                 {isMember && (
                   <Link
                     to={`/projects/${project._id}/tasks`}
@@ -197,6 +182,17 @@ const applicationStatus = myApplication?.status;
                   >
                     <span>📋</span>
                     <span>Tasks</span>
+                  </Link>
+                )}
+
+                {/* Files button for all members */}
+                {isMember && (
+                  <Link
+                    to={`/projects/${project._id}/files`}
+                    className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 flex items-center gap-2"
+                  >
+                    <span>📁</span>
+                    <span>Files</span>
                   </Link>
                 )}
                 
@@ -216,7 +212,9 @@ const applicationStatus = myApplication?.status;
                     </button>
                   </>
                 )}
-                {!isOwner && !isMember && !hasApplied && project.status === 'open' && (
+
+                {/* Application Status Display */}
+                {!isOwner && !isMember && !myApplication && project.status === 'open' && (
                   <button
                     onClick={() => setShowApplicationModal(true)}
                     className="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
@@ -224,9 +222,23 @@ const applicationStatus = myApplication?.status;
                     Apply to Join
                   </button>
                 )}
-                {hasApplied && (
-                  <span className="px-6 py-2 bg-yellow-100 text-yellow-800 rounded-lg">
+
+                {!isOwner && !isMember && myApplication && applicationStatus === 'pending' && (
+                  <span className="px-6 py-2 bg-yellow-100 text-yellow-800 rounded-lg flex items-center gap-2">
+                    <span className="animate-pulse">⏳</span>
                     Application Pending
+                  </span>
+                )}
+
+                {!isMember && myApplication && applicationStatus === 'accepted' && (
+                  <span className="px-6 py-2 bg-green-100 text-green-800 rounded-lg">
+                    ✓ Application Accepted
+                  </span>
+                )}
+
+                {!isMember && myApplication && applicationStatus === 'rejected' && (
+                  <span className="px-6 py-2 bg-red-100 text-red-800 rounded-lg">
+                    ✗ Application Rejected
                   </span>
                 )}
               </div>
@@ -375,7 +387,7 @@ const applicationStatus = myApplication?.status;
                     {project.applicants
                       .filter((a) => a.status === 'pending')
                       .map((applicant) => (
-                        <div key={applicant._id} className="p-4 border border-gray-200 rounded-lg">
+                        <div key={applicant._id} className="p-4 border border-yellow-200 bg-yellow-50 rounded-lg">
                           <div className="flex items-start justify-between mb-3">
                             <div className="flex items-center space-x-3">
                               {applicant.user.avatar ? (
@@ -401,22 +413,27 @@ const applicationStatus = myApplication?.status;
                                 </p>
                               </div>
                             </div>
+                            <span className="px-2 py-1 bg-yellow-200 text-yellow-800 text-xs rounded-full">
+                              New
+                            </span>
                           </div>
                           {applicant.message && (
-                            <p className="text-gray-700 text-sm mb-3">{applicant.message}</p>
+                            <p className="text-gray-700 text-sm mb-3 bg-white p-3 rounded border border-gray-200">
+                              {applicant.message}
+                            </p>
                           )}
                           <div className="flex gap-2">
                             <button
                               onClick={() => handleAcceptReject(applicant.user._id, 'accepted')}
                               className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm"
                             >
-                              Accept
+                              ✓ Accept
                             </button>
                             <button
                               onClick={() => handleAcceptReject(applicant.user._id, 'rejected')}
                               className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm"
                             >
-                              Reject
+                              ✗ Reject
                             </button>
                           </div>
                         </div>
@@ -428,7 +445,7 @@ const applicationStatus = myApplication?.status;
 
             {/* Sidebar */}
             <div className="space-y-6">
-              {/* Quick Actions - NEW */}
+              {/* Quick Actions */}
               {isMember && (
                 <div className="bg-white rounded-lg shadow-md p-6">
                   <h2 className="text-lg font-semibold text-gray-800 mb-4">Quick Actions</h2>
@@ -438,6 +455,12 @@ const applicationStatus = myApplication?.status;
                       className="block w-full px-4 py-3 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 text-center font-medium transition-colors"
                     >
                       📋 Manage Tasks
+                    </Link>
+                    <Link
+                      to={`/projects/${project._id}/files`}
+                      className="block w-full px-4 py-3 bg-purple-50 text-purple-700 rounded-lg hover:bg-purple-100 text-center font-medium transition-colors"
+                    >
+                      📁 View Files
                     </Link>
                     {isOwner && (
                       <Link

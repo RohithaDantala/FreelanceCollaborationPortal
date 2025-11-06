@@ -1,4 +1,5 @@
 const Project = require('../models/Project');
+const Notification = require('../models/Notification');
 const { AppError } = require('../middleware/errorHandler');
 
 // @desc    Create new project
@@ -289,6 +290,17 @@ exports.applyToProject = async (req, res, next) => {
 
     await project.save();
 
+    // CREATE NOTIFICATION FOR PROJECT OWNER
+    await Notification.createNotification({
+      recipient: project.owner,
+      sender: req.user.id,
+      type: 'project_application',
+      title: 'New Project Application',
+      message: `${req.user.firstName} ${req.user.lastName} has applied to join "${project.title}"`,
+      link: `/projects/${project._id}`,
+      project: project._id,
+    });
+
     res.status(200).json({
       success: true,
       message: 'Application submitted successfully',
@@ -341,11 +353,29 @@ exports.handleApplication = async (req, res, next) => {
 
     await project.save();
     
+    // CREATE NOTIFICATION FOR APPLICANT
+    const notificationType = status === 'accepted' ? 'application_accepted' : 'application_rejected';
+    const notificationTitle = status === 'accepted' ? 'Application Accepted!' : 'Application Not Accepted';
+    const notificationMessage = status === 'accepted' 
+      ? `Your application to join "${project.title}" has been accepted!`
+      : `Your application to join "${project.title}" was not accepted at this time.`;
+
+    await Notification.createNotification({
+      recipient: applicantId,
+      sender: req.user.id,
+      type: notificationType,
+      title: notificationTitle,
+      message: notificationMessage,
+      link: `/projects/${project._id}`,
+      project: project._id,
+    });
+
     await project.populate([
       { path: 'owner', select: 'firstName lastName email avatar' },
       { path: 'members.user', select: 'firstName lastName avatar' },
       { path: 'applicants.user', select: 'firstName lastName avatar' }
     ]);
+    
     res.status(200).json({
       success: true,
       message: `Application ${status} successfully`,
@@ -383,7 +413,24 @@ exports.removeMember = async (req, res, next) => {
       m => m.user.toString() !== memberId
     );
 
+    // Also update applicant status if they were accepted
+    const applicant = project.applicants.find(a => a.user.toString() === memberId);
+    if (applicant) {
+      applicant.status = 'removed';
+    }
+
     await project.save();
+
+    // CREATE NOTIFICATION FOR REMOVED MEMBER
+    await Notification.createNotification({
+      recipient: memberId,
+      sender: req.user.id,
+      type: 'member_removed',
+      title: 'Removed from Project',
+      message: `You have been removed from the project "${project.title}"`,
+      link: `/projects/${project._id}`,
+      project: project._id,
+    });
 
     res.status(200).json({
       success: true,

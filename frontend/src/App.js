@@ -13,9 +13,10 @@ import CreateProject from './pages/CreateProject';
 import BrowseProjects from './pages/BrowseProjects';
 import ProjectDetail from './pages/ProjectDetail';
 import MyProjects from './pages/MyProjects';
-import ProjectTasks from './pages/ProjectTasks'; // NEW
+import ProjectTasks from './pages/ProjectTasks';
+import ProjectFiles from './pages/ProjectFiles';
 import PrivateRoute from './components/PrivateRoute';
-import ProjectFiles from './pages/ProjectFiles'; // adjust path as needed
+import OwnerRoute from './components/OwnerRoute';
 
 function App() {
   return (
@@ -58,9 +59,8 @@ function App() {
             <Route path="/register" element={<Register />} />
             <Route path="/projects" element={<BrowseProjects />} />
             <Route path="/projects/:id" element={<ProjectDetail />} />
-            <Route path="/project-files" element={<ProjectFiles />} />
 
-            {/* Protected routes */}
+            {/* Protected routes - Require login */}
             <Route 
               path="/dashboard" 
               element={
@@ -69,14 +69,19 @@ function App() {
                 </PrivateRoute>
               } 
             />
+            
+            {/* Owner-only route - Require project_owner or admin role */}
             <Route 
               path="/projects/create" 
               element={
                 <PrivateRoute>
-                  <CreateProject />
+                  <OwnerRoute>
+                    <CreateProject />
+                  </OwnerRoute>
                 </PrivateRoute>
               } 
             />
+            
             <Route 
               path="/my-projects" 
               element={
@@ -102,7 +107,6 @@ function App() {
               } 
             />
           </Routes>
-
         </main>
         
         <Footer />

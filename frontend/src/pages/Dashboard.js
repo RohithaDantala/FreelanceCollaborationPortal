@@ -25,6 +25,7 @@ const Dashboard = () => {
 
   const ownedProjects = myProjects.filter((p) => p.owner._id === user.id);
   const activeProjects = myProjects.filter((p) => p.status === 'in_progress');
+  const canCreateProject = user.role === 'project_owner' || user.role === 'admin';
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -36,9 +37,21 @@ const Dashboard = () => {
               <h1 className="text-3xl font-bold text-gray-800 mb-2">
                 Welcome back, {user.firstName}! 👋
               </h1>
-              <p className="text-gray-600">
-                Role: <span className="font-semibold capitalize">{user.role.replace('_', ' ')}</span>
-              </p>
+              <div className="flex items-center gap-2">
+                <p className="text-gray-600">
+                  Role: <span className="font-semibold capitalize">{user.role.replace('_', ' ')}</span>
+                </p>
+                <span className={`px-3 py-1 text-xs rounded-full font-medium ${
+                  user.role === 'project_owner' 
+                    ? 'bg-purple-100 text-purple-800' 
+                    : user.role === 'admin'
+                    ? 'bg-red-100 text-red-800'
+                    : 'bg-blue-100 text-blue-800'
+                }`}>
+                  {user.role === 'project_owner' ? '👔 Owner' : 
+                   user.role === 'admin' ? '⚡ Admin' : '💼 Freelancer'}
+                </span>
+              </div>
             </div>
             <button
               onClick={handleLogout}
@@ -68,8 +81,12 @@ const Dashboard = () => {
           <div className="bg-white rounded-lg shadow-md p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-gray-500 text-sm font-medium">Owned Projects</p>
-                <p className="text-3xl font-bold text-gray-800 mt-1">{ownedProjects.length}</p>
+                <p className="text-gray-500 text-sm font-medium">
+                  {canCreateProject ? 'Owned Projects' : 'Joined Projects'}
+                </p>
+                <p className="text-3xl font-bold text-gray-800 mt-1">
+                  {canCreateProject ? ownedProjects.length : myProjects.length}
+                </p>
               </div>
               <div className="bg-purple-100 p-3 rounded-full">
                 <svg className="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -96,17 +113,31 @@ const Dashboard = () => {
 
         {/* Quick Actions */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-          <Link
-            to="/projects/create"
-            className="bg-gradient-to-r from-primary-500 to-primary-700 rounded-lg p-6 text-white hover:from-primary-600 hover:to-primary-800 transition-all shadow-md"
-          >
-            <h3 className="text-xl font-bold mb-2">
-              ✨ Create New Project
-            </h3>
-            <p className="text-primary-100">
-              Start a new project and invite collaborators
-            </p>
-          </Link>
+          {canCreateProject ? (
+            <Link
+              to="/projects/create"
+              className="bg-gradient-to-r from-primary-500 to-primary-700 rounded-lg p-6 text-white hover:from-primary-600 hover:to-primary-800 transition-all shadow-md"
+            >
+              <h3 className="text-xl font-bold mb-2">
+                ✨ Create New Project
+              </h3>
+              <p className="text-primary-100">
+                Start a new project and invite collaborators
+              </p>
+            </Link>
+          ) : (
+            <Link
+              to="/projects"
+              className="bg-gradient-to-r from-primary-500 to-primary-700 rounded-lg p-6 text-white hover:from-primary-600 hover:to-primary-800 transition-all shadow-md"
+            >
+              <h3 className="text-xl font-bold mb-2">
+                🔍 Find Projects
+              </h3>
+              <p className="text-primary-100">
+                Browse available projects and apply to join
+              </p>
+            </Link>
+          )}
 
           <Link
             to="/projects"
@@ -116,10 +147,26 @@ const Dashboard = () => {
               🔍 Browse Projects
             </h3>
             <p className="text-secondary-100">
-              Discover exciting projects to join
+              Discover exciting projects to {canCreateProject ? 'explore' : 'join'}
             </p>
           </Link>
         </div>
+
+        {/* Role-specific Information */}
+        {!canCreateProject && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+            <div className="flex items-start gap-3">
+              <span className="text-2xl">💡</span>
+              <div>
+                <h3 className="font-semibold text-blue-900 mb-1">Freelancer Account</h3>
+                <p className="text-blue-800 text-sm">
+                  As a freelancer, you can browse and apply to join projects. If you want to create your own projects, 
+                  please register a new account with the "Project Owner" role.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Recent Projects */}
         {myProjects.length > 0 && (
@@ -139,9 +186,16 @@ const Dashboard = () => {
                 >
                   <div>
                     <h3 className="font-medium text-gray-800">{project.title}</h3>
-                    <p className="text-sm text-gray-500 capitalize">
-                      {project.category.replace('_', ' ')} • {project.status.replace('_', ' ')}
-                    </p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <p className="text-sm text-gray-500 capitalize">
+                        {project.category.replace('_', ' ')} • {project.status.replace('_', ' ')}
+                      </p>
+                      {project.owner._id === user.id && (
+                        <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs rounded-full">
+                          Owner
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <span className="text-sm text-gray-600">
                     {project.members?.length}/{project.maxMembers} members
@@ -157,15 +211,26 @@ const Dashboard = () => {
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
             <h3 className="text-lg font-bold text-yellow-900 mb-2">🚀 Get Started!</h3>
             <p className="text-yellow-800 mb-4">
-              You haven't created or joined any projects yet. Create your first project or browse existing ones to get started.
+              {canCreateProject 
+                ? "You haven't created any projects yet. Create your first project to get started!"
+                : "You haven't joined any projects yet. Browse available projects and apply to join!"}
             </p>
             <div className="flex gap-3">
-              <Link
-                to="/projects/create"
-                className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
-              >
-                Create Project
-              </Link>
+              {canCreateProject ? (
+                <Link
+                  to="/projects/create"
+                  className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+                >
+                  Create Project
+                </Link>
+              ) : (
+                <Link
+                  to="/projects"
+                  className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+                >
+                  Find Projects
+                </Link>
+              )}
               <Link
                 to="/projects"
                 className="px-4 py-2 border border-primary-600 text-primary-600 rounded-lg hover:bg-primary-50"
