@@ -142,6 +142,17 @@ const ProjectDetail = () => {
 
               {/* Action Buttons */}
               <div className="flex gap-2">
+                {/* Tasks button for all members (including owner) */}
+                {isMember && (
+                  <Link
+                    to={`/projects/${project._id}/tasks`}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
+                  >
+                    <span>📋</span>
+                    <span>Tasks</span>
+                  </Link>
+                )}
+                
                 {isOwner && (
                   <>
                     <Link
@@ -370,6 +381,29 @@ const ProjectDetail = () => {
 
             {/* Sidebar */}
             <div className="space-y-6">
+              {/* Quick Actions - NEW */}
+              {isMember && (
+                <div className="bg-white rounded-lg shadow-md p-6">
+                  <h2 className="text-lg font-semibold text-gray-800 mb-4">Quick Actions</h2>
+                  <div className="space-y-2">
+                    <Link
+                      to={`/projects/${project._id}/tasks`}
+                      className="block w-full px-4 py-3 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 text-center font-medium transition-colors"
+                    >
+                      📋 Manage Tasks
+                    </Link>
+                    {isOwner && (
+                      <Link
+                        to={`/projects/${project._id}/edit`}
+                        className="block w-full px-4 py-3 bg-primary-50 text-primary-700 rounded-lg hover:bg-primary-100 text-center font-medium transition-colors"
+                      >
+                        ✏️ Edit Project
+                      </Link>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {/* Project Info */}
               <div className="bg-white rounded-lg shadow-md p-6">
                 <h2 className="text-lg font-semibold text-gray-800 mb-4">Project Details</h2>
