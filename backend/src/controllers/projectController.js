@@ -328,16 +328,24 @@ exports.handleApplication = async (req, res, next) => {
     applicant.status = status;
 
     // If accepted, add to members
-    if (status === 'accepted') {
-      project.members.push({
-        user: applicantId,
-        role: 'member',
-        joinedAt: Date.now(),
-      });
+    const isMember = project.members.some(m => m.user.toString() === applicantId);
+    if (status === 'accepted') {  
+      if (!isMember) {
+        project.members.push({
+          user: applicantId,
+          role: 'member',
+          joinedAt: Date.now(),
+        });
+      }
     }
 
     await project.save();
-
+    
+    await project.populate([
+      { path: 'owner', select: 'firstName lastName email avatar' },
+      { path: 'members.user', select: 'firstName lastName avatar' },
+      { path: 'applicants.user', select: 'firstName lastName avatar' }
+    ]);
     res.status(200).json({
       success: true,
       message: `Application ${status} successfully`,
