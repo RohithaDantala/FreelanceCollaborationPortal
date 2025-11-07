@@ -32,26 +32,67 @@ function App() {
             <Route 
               path="/" 
               element={
-                <div className="container mx-auto px-4 py-16 text-center">
-                  <h1 className="text-4xl font-bold text-gray-800 mb-4">
-                    Freelance Project Collaboration Portal
-                  </h1>
-                  <p className="text-xl text-gray-600 mb-8">
-                    Connect, collaborate, and deliver exceptional projects together
-                  </p>
-                  <div className="flex gap-4 justify-center">
-                    <a 
-                      href="/register" 
-                      className="px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
-                    >
-                      Get Started
-                    </a>
-                    <a 
-                      href="/projects" 
-                      className="px-6 py-3 border-2 border-primary-600 text-primary-600 rounded-lg hover:bg-primary-50 transition-colors"
-                    >
-                      Browse Projects
-                    </a>
+                <div className="container mx-auto px-4 py-16">
+                  <div className="max-w-4xl mx-auto text-center">
+                    <h1 className="text-5xl font-bold text-gray-800 mb-4">
+                      Freelance Project Collaboration Portal
+                    </h1>
+                    <p className="text-xl text-gray-600 mb-8">
+                      Connect, collaborate, and deliver exceptional projects together
+                    </p>
+                    <div className="flex gap-4 justify-center mb-12">
+                      <a 
+                        href="/register" 
+                        className="px-8 py-4 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors text-lg font-semibold shadow-lg"
+                      >
+                        Get Started Free
+                      </a>
+                      <a 
+                        href="/projects" 
+                        className="px-8 py-4 border-2 border-primary-600 text-primary-600 rounded-lg hover:bg-primary-50 transition-colors text-lg font-semibold"
+                      >
+                        Browse Projects
+                      </a>
+                    </div>
+                    
+                    {/* Feature Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mt-16">
+                      <div className="bg-white p-6 rounded-lg shadow-md">
+                        <div className="text-4xl mb-4">📋</div>
+                        <h3 className="text-xl font-bold text-gray-800 mb-2">Task Management</h3>
+                        <p className="text-gray-600">Organize tasks with Kanban boards and track progress in real-time</p>
+                      </div>
+                      
+                      <div className="bg-white p-6 rounded-lg shadow-md">
+                        <div className="text-4xl mb-4">🎯</div>
+                        <h3 className="text-xl font-bold text-gray-800 mb-2">Milestone Tracking</h3>
+                        <p className="text-gray-600">Set milestones and monitor project progress with visual analytics</p>
+                      </div>
+                      
+                      <div className="bg-white p-6 rounded-lg shadow-md">
+                        <div className="text-4xl mb-4">📁</div>
+                        <h3 className="text-xl font-bold text-gray-800 mb-2">File Management</h3>
+                        <p className="text-gray-600">Share files, manage deliverables, and version control</p>
+                      </div>
+                      
+                      <div className="bg-white p-6 rounded-lg shadow-md">
+                        <div className="text-4xl mb-4">👥</div>
+                        <h3 className="text-xl font-bold text-gray-800 mb-2">Team Collaboration</h3>
+                        <p className="text-gray-600">Work together seamlessly with real-time notifications</p>
+                      </div>
+                      
+                      <div className="bg-white p-6 rounded-lg shadow-md">
+                        <div className="text-4xl mb-4">📊</div>
+                        <h3 className="text-xl font-bold text-gray-800 mb-2">Progress Analytics</h3>
+                        <p className="text-gray-600">Get insights with detailed progress reports and dashboards</p>
+                      </div>
+                      
+                      <div className="bg-white p-6 rounded-lg shadow-md">
+                        <div className="text-4xl mb-4">🔔</div>
+                        <h3 className="text-xl font-bold text-gray-800 mb-2">Smart Notifications</h3>
+                        <p className="text-gray-600">Stay updated with instant notifications for all activities</p>
+                      </div>
+                    </div>
                   </div>
                 </div>
               } 
@@ -92,6 +133,7 @@ function App() {
                 </PrivateRoute>
               } 
             />
+            
             <Route 
               path="/projects/:id/tasks" 
               element={
@@ -100,11 +142,21 @@ function App() {
                 </PrivateRoute>
               } 
             />
+            
             <Route 
               path="/projects/:id/files" 
               element={
                 <PrivateRoute>
                   <ProjectFiles />
+                </PrivateRoute>
+              } 
+            />
+            
+            <Route 
+              path="/projects/:id/milestones" 
+              element={
+                <PrivateRoute>
+                  <ProjectMilestones />
                 </PrivateRoute>
               } 
             />

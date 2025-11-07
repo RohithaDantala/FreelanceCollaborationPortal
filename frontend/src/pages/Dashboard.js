@@ -31,14 +31,14 @@ const Dashboard = () => {
     <div className="container mx-auto px-4 py-8">
       <div className="max-w-6xl mx-auto">
         {/* Welcome Section */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+        <div className="bg-gradient-to-r from-primary-500 to-primary-700 rounded-lg shadow-lg p-8 mb-6 text-white">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-gray-800 mb-2">
+              <h1 className="text-4xl font-bold mb-2">
                 Welcome back, {user.firstName}! 👋
               </h1>
               <div className="flex items-center gap-2">
-                <p className="text-gray-600">
+                <p className="text-primary-100">
                   Role: <span className="font-semibold capitalize">{user.role.replace('_', ' ')}</span>
                 </p>
                 <span className={`px-3 py-1 text-xs rounded-full font-medium ${
@@ -53,18 +53,12 @@ const Dashboard = () => {
                 </span>
               </div>
             </div>
-            <button
-              onClick={handleLogout}
-              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-            >
-              Logout
-            </button>
           </div>
         </div>
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-          <div className="bg-white rounded-lg shadow-md p-6">
+          <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-primary-600">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-500 text-sm font-medium">Total Projects</p>
@@ -78,7 +72,7 @@ const Dashboard = () => {
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow-md p-6">
+          <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-purple-600">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-500 text-sm font-medium">
@@ -96,7 +90,7 @@ const Dashboard = () => {
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow-md p-6">
+          <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-green-600">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-500 text-sm font-medium">Active Projects</p>
@@ -116,45 +110,54 @@ const Dashboard = () => {
           {canCreateProject ? (
             <Link
               to="/projects/create"
-              className="bg-gradient-to-r from-primary-500 to-primary-700 rounded-lg p-6 text-white hover:from-primary-600 hover:to-primary-800 transition-all shadow-md"
+              className="bg-gradient-to-br from-primary-500 to-primary-700 rounded-lg p-6 text-white hover:from-primary-600 hover:to-primary-800 transition-all shadow-md hover:shadow-xl transform hover:-translate-y-1"
             >
-              <h3 className="text-xl font-bold mb-2">
-                ✨ Create New Project
-              </h3>
-              <p className="text-primary-100">
-                Start a new project and invite collaborators
-              </p>
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-white bg-opacity-20 rounded-lg flex items-center justify-center">
+                  <span className="text-3xl">✨</span>
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold mb-1">Create New Project</h3>
+                  <p className="text-primary-100">Start a new project and invite collaborators</p>
+                </div>
+              </div>
             </Link>
           ) : (
             <Link
               to="/projects"
-              className="bg-gradient-to-r from-primary-500 to-primary-700 rounded-lg p-6 text-white hover:from-primary-600 hover:to-primary-800 transition-all shadow-md"
+              className="bg-gradient-to-br from-primary-500 to-primary-700 rounded-lg p-6 text-white hover:from-primary-600 hover:to-primary-800 transition-all shadow-md hover:shadow-xl transform hover:-translate-y-1"
             >
-              <h3 className="text-xl font-bold mb-2">
-                🔍 Find Projects
-              </h3>
-              <p className="text-primary-100">
-                Browse available projects and apply to join
-              </p>
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-white bg-opacity-20 rounded-lg flex items-center justify-center">
+                  <span className="text-3xl">🔍</span>
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold mb-1">Find Projects</h3>
+                  <p className="text-primary-100">Browse available projects and apply to join</p>
+                </div>
+              </div>
             </Link>
           )}
 
           <Link
-            to="/projects"
-            className="bg-gradient-to-r from-secondary-500 to-secondary-700 rounded-lg p-6 text-white hover:from-secondary-600 hover:to-secondary-800 transition-all shadow-md"
+            to="/my-projects"
+            className="bg-gradient-to-br from-purple-500 to-purple-700 rounded-lg p-6 text-white hover:from-purple-600 hover:to-purple-800 transition-all shadow-md hover:shadow-xl transform hover:-translate-y-1"
           >
-            <h3 className="text-xl font-bold mb-2">
-              🔍 Browse Projects
-            </h3>
-            <p className="text-secondary-100">
-              Discover exciting projects to {canCreateProject ? 'explore' : 'join'}
-            </p>
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-white bg-opacity-20 rounded-lg flex items-center justify-center">
+                <span className="text-3xl">📂</span>
+              </div>
+              <div>
+                <h3 className="text-xl font-bold mb-1">My Projects</h3>
+                <p className="text-purple-100">View and manage all your projects</p>
+              </div>
+            </div>
           </Link>
         </div>
 
         {/* Role-specific Information */}
         {!canCreateProject && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+          <div className="bg-blue-50 border-l-4 border-blue-500 rounded-lg p-4 mb-6">
             <div className="flex items-start gap-3">
               <span className="text-2xl">💡</span>
               <div>
@@ -182,24 +185,38 @@ const Dashboard = () => {
                 <Link
                   key={project._id}
                   to={`/projects/${project._id}`}
-                  className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                  className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-primary-300 transition-all"
                 >
-                  <div>
-                    <h3 className="font-medium text-gray-800">{project.title}</h3>
-                    <div className="flex items-center gap-2 mt-1">
-                      <p className="text-sm text-gray-500 capitalize">
-                        {project.category.replace('_', ' ')} • {project.status.replace('_', ' ')}
-                      </p>
-                      {project.owner._id === user.id && (
-                        <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs rounded-full">
-                          Owner
-                        </span>
-                      )}
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center">
+                      <span className="text-2xl">
+                        {project.category === 'web_development' ? '💻' :
+                         project.category === 'mobile_app' ? '📱' :
+                         project.category === 'design' ? '🎨' :
+                         project.category === 'writing' ? '✍️' :
+                         project.category === 'marketing' ? '📢' :
+                         project.category === 'data_science' ? '📊' : '📁'}
+                      </span>
+                    </div>
+                    <div>
+                      <h3 className="font-medium text-gray-800">{project.title}</h3>
+                      <div className="flex items-center gap-2 mt-1">
+                        <p className="text-sm text-gray-500 capitalize">
+                          {project.category.replace('_', ' ')} • {project.status.replace('_', ' ')}
+                        </p>
+                        {project.owner._id === user.id && (
+                          <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs rounded-full">
+                            Owner
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
-                  <span className="text-sm text-gray-600">
-                    {project.members?.length}/{project.maxMembers} members
-                  </span>
+                  <div className="text-right">
+                    <span className="text-sm text-gray-600">
+                      {project.members?.length}/{project.maxMembers} members
+                    </span>
+                  </div>
                 </Link>
               ))}
             </div>
@@ -208,35 +225,40 @@ const Dashboard = () => {
 
         {/* Empty State */}
         {myProjects.length === 0 && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
-            <h3 className="text-lg font-bold text-yellow-900 mb-2">🚀 Get Started!</h3>
-            <p className="text-yellow-800 mb-4">
-              {canCreateProject 
-                ? "You haven't created any projects yet. Create your first project to get started!"
-                : "You haven't joined any projects yet. Browse available projects and apply to join!"}
-            </p>
-            <div className="flex gap-3">
-              {canCreateProject ? (
-                <Link
-                  to="/projects/create"
-                  className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
-                >
-                  Create Project
-                </Link>
-              ) : (
-                <Link
-                  to="/projects"
-                  className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
-                >
-                  Find Projects
-                </Link>
-              )}
-              <Link
-                to="/projects"
-                className="px-4 py-2 border border-primary-600 text-primary-600 rounded-lg hover:bg-primary-50"
-              >
-                Browse Projects
-              </Link>
+          <div className="bg-yellow-50 border-l-4 border-yellow-500 rounded-lg p-6">
+            <div className="flex items-start gap-4">
+              <span className="text-4xl">🚀</span>
+              <div>
+                <h3 className="text-lg font-bold text-yellow-900 mb-2">Get Started!</h3>
+                <p className="text-yellow-800 mb-4">
+                  {canCreateProject 
+                    ? "You haven't created any projects yet. Create your first project to get started!"
+                    : "You haven't joined any projects yet. Browse available projects and apply to join!"}
+                </p>
+                <div className="flex gap-3">
+                  {canCreateProject ? (
+                    <Link
+                      to="/projects/create"
+                      className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+                    >
+                      Create Project
+                    </Link>
+                  ) : (
+                    <Link
+                      to="/projects"
+                      className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+                    >
+                      Browse Projects
+                    </Link>
+                  )}
+                  <Link
+                    to="/projects"
+                    className="px-4 py-2 border border-primary-600 text-primary-600 rounded-lg hover:bg-primary-50"
+                  >
+                    Explore Projects
+                  </Link>
+                </div>
+              </div>
             </div>
           </div>
         )}

@@ -14,7 +14,6 @@ const Header = () => {
     navigate('/login');
   };
 
-  // Check if user is project owner or admin
   const canCreateProject = user && (user.role === 'project_owner' || user.role === 'admin');
 
   return (
