@@ -9,8 +9,10 @@ const ProjectReports = () => {
   const [reports, setReports] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [dateRange, setDateRange] = useState({
-    startDate: '',
+    startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 days ago
     endDate: new Date().toISOString().split('T')[0],
   });
 

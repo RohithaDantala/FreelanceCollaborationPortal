@@ -16,9 +16,13 @@ import MyProjects from './pages/MyProjects';
 import ProjectTasks from './pages/ProjectTasks';
 import ProjectFiles from './pages/ProjectFiles';
 import ProjectMilestones from './pages/ProjectMilestones';
+import ProjectReports from './pages/ProjectReports';
+import AdminDashboard from './pages/AdminDashboard';
+import AdminUsers from './pages/AdminUsers';
 import ProjectMemberRoute from './components/ProjectMemberRoute';
 import PrivateRoute from './components/PrivateRoute';
 import OwnerRoute from './components/OwnerRoute';
+import AdminRoute from './components/AdminRoute';
 
 function App() {
   return (
@@ -134,39 +138,93 @@ function App() {
               } 
             />
             
-          <Route 
-            path="/projects/:id/tasks" 
-            element={
-              <PrivateRoute>
-                <ProjectMemberRoute>
-                  <ProjectTasks />
-                </ProjectMemberRoute>
-              </PrivateRoute>
-            } 
-          />
+            {/* Project member routes */}
+            <Route 
+              path="/projects/:id/tasks" 
+              element={
+                <PrivateRoute>
+                  <ProjectMemberRoute>
+                    <ProjectTasks />
+                  </ProjectMemberRoute>
+                </PrivateRoute>
+              } 
+            />
 
-          <Route 
-            path="/projects/:id/files" 
-            element={
-              <PrivateRoute>
-                <ProjectMemberRoute>
-                  <ProjectFiles />
-                </ProjectMemberRoute>
-              </PrivateRoute>
-            } 
-          />
+            <Route 
+              path="/projects/:id/files" 
+              element={
+                <PrivateRoute>
+                  <ProjectMemberRoute>
+                    <ProjectFiles />
+                  </ProjectMemberRoute>
+                </PrivateRoute>
+              } 
+            />
 
-          <Route 
-            path="/projects/:id/milestones" 
-            element={
-              <PrivateRoute>
-                <ProjectMemberRoute>
-                  <ProjectMilestones />
-                </ProjectMemberRoute>
-              </PrivateRoute>
-            } 
-          />
+            <Route 
+              path="/projects/:id/milestones" 
+              element={
+                <PrivateRoute>
+                  <ProjectMemberRoute>
+                    <ProjectMilestones />
+                  </ProjectMemberRoute>
+                </PrivateRoute>
+              } 
+            />
 
+            {/* NEW: Reports Route */}
+            <Route 
+              path="/projects/:id/reports" 
+              element={
+                <PrivateRoute>
+                  <ProjectMemberRoute>
+                    <ProjectReports />
+                  </ProjectMemberRoute>
+                </PrivateRoute>
+              } 
+            />
+
+            {/* Admin routes */}
+            <Route 
+              path="/admin/dashboard" 
+              element={
+                <PrivateRoute>
+                  <AdminRoute>
+                    <AdminDashboard />
+                  </AdminRoute>
+                </PrivateRoute>
+              } 
+            />
+
+            <Route 
+              path="/admin/users" 
+              element={
+                <PrivateRoute>
+                  <AdminRoute>
+                    <AdminUsers />
+                  </AdminRoute>
+                </PrivateRoute>
+              } 
+            />
+
+            {/* 404 Not Found */}
+            <Route 
+              path="*" 
+              element={
+                <div className="min-h-screen flex items-center justify-center">
+                  <div className="text-center">
+                    <h1 className="text-6xl font-bold text-gray-300 mb-4">404</h1>
+                    <p className="text-xl text-gray-600 mb-8">Page not found</p>
+                    <a 
+                      href="/" 
+                      className="px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+                    >
+                      Go Home
+                    </a>
+                  </div>
+                </div>
+              } 
+            />
           </Routes>
         </main>
         
