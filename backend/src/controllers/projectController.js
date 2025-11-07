@@ -1,7 +1,7 @@
 const Project = require('../models/Project');
 const Notification = require('../models/Notification');
 const { AppError } = require('../middleware/errorHandler');
-
+const { sendEmail, emailTemplates } = require('../config/email');
 // @desc    Create new project
 // @route   POST /api/projects
 // @access  Private
@@ -38,6 +38,42 @@ exports.createProject = async (req, res, next) => {
     // Populate owner details
     await project.populate('owner', 'firstName lastName email avatar');
 
+    // ✅ NEW: SEND EMAILS TO MATCHING FREELANCERS
+    if (isPublic && skillsRequired && skillsRequired.length > 0) {
+      try {
+        const User = require('../models/User');
+        
+        // Find freelancers with matching skills
+        const matchingFreelancers = await User.find({
+          role: 'freelancer',
+          isActive: true,
+          skills: { $in: skillsRequired },
+        }).select('firstName lastName email skills');
+
+        // Send email to each matching freelancer
+        const emailPromises = matchingFreelancers.map(async (freelancer) => {
+          try {
+            const emailTemplate = emailTemplates.projectCreated({
+              freelancerName: freelancer.firstName,
+              projectTitle: project.title,
+              clientName: `${req.user.firstName} ${req.user.lastName}`,
+              skills: skillsRequired,
+              projectId: project._id,
+            });
+            
+            await sendEmail(freelancer.email, emailTemplate);
+          } catch (err) {
+            console.error(`Failed to send email to ${freelancer.email}:`, err);
+          }
+        });
+
+        await Promise.all(emailPromises);
+        console.log(`✅ Sent ${matchingFreelancers.length} project match emails`);
+      } catch (error) {
+        console.error('Failed to send project match emails:', error);
+      }
+    }
+
     res.status(201).json({
       success: true,
       message: 'Project created successfully',
@@ -47,7 +83,6 @@ exports.createProject = async (req, res, next) => {
     next(error);
   }
 };
-
 // @desc    Get all projects (with filters)
 // @route   GET /api/projects
 // @access  Public
@@ -258,7 +293,7 @@ exports.deleteProject = async (req, res, next) => {
 // @access  Private
 exports.applyToProject = async (req, res, next) => {
   try {
-    const project = await Project.findById(req.params.id);
+    const project = await Project.findById(req.params.id).populate('owner', 'firstName lastName email');
 
     if (!project) {
       return next(new AppError('Project not found', 404));
@@ -292,7 +327,7 @@ exports.applyToProject = async (req, res, next) => {
 
     // CREATE NOTIFICATION FOR PROJECT OWNER
     await Notification.createNotification({
-      recipient: project.owner,
+      recipient: project.owner._id,
       sender: req.user.id,
       type: 'project_application',
       title: 'New Project Application',
@@ -300,6 +335,21 @@ exports.applyToProject = async (req, res, next) => {
       link: `/projects/${project._id}`,
       project: project._id,
     });
+
+    // ✅ NEW: SEND EMAIL TO PROJECT OWNER
+    try {
+      const emailTemplate = emailTemplates.applicationReceived({
+        applicantName: `${req.user.firstName} ${req.user.lastName}`,
+        projectTitle: project.title,
+        clientName: project.owner.firstName,
+        projectId: project._id,
+      });
+      
+      await sendEmail(project.owner.email, emailTemplate);
+    } catch (emailError) {
+      console.error('Failed to send application email:', emailError);
+      // Don't fail the request if email fails
+    }
 
     res.status(200).json({
       success: true,
@@ -309,20 +359,19 @@ exports.applyToProject = async (req, res, next) => {
     next(error);
   }
 };
-
 // @desc    Accept/Reject application
 // @route   PUT /api/projects/:id/applicants/:applicantId
 // @access  Private (Owner only)
 exports.handleApplication = async (req, res, next) => {
   try {
-    const project = await Project.findById(req.params.id);
+    const project = await Project.findById(req.params.id).populate('owner', 'firstName lastName email');
 
     if (!project) {
       return next(new AppError('Project not found', 404));
     }
 
     // Check if user is owner
-    if (project.owner.toString() !== req.user.id) {
+    if (project.owner._id.toString() !== req.user.id) {
       return next(new AppError('Not authorized', 403));
     }
 
@@ -340,7 +389,7 @@ exports.handleApplication = async (req, res, next) => {
     // Update applicant status
     applicant.status = status;
 
-    // CRITICAL FIX: Only add to members if accepted AND not already a member
+    // Only add to members if accepted AND not already a member
     const isMember = project.members.some(m => m.user.toString() === applicantId);
     
     if (status === 'accepted' && !isMember) {  
@@ -352,6 +401,10 @@ exports.handleApplication = async (req, res, next) => {
     }
 
     await project.save();
+    
+    // Get applicant details for email
+    const User = require('../models/User');
+    const applicantUser = await User.findById(applicantId);
     
     // CREATE NOTIFICATION FOR APPLICANT
     const notificationType = status === 'accepted' ? 'application_accepted' : 'application_rejected';
@@ -370,6 +423,25 @@ exports.handleApplication = async (req, res, next) => {
       project: project._id,
     });
 
+    // ✅ NEW: SEND EMAIL TO APPLICANT
+    try {
+      const emailTemplate = status === 'accepted'
+        ? emailTemplates.applicationApproved({
+            applicantName: applicantUser.firstName,
+            projectTitle: project.title,
+            clientName: project.owner.firstName,
+            projectId: project._id,
+          })
+        : emailTemplates.applicationRejected({
+            applicantName: applicantUser.firstName,
+            projectTitle: project.title,
+          });
+      
+      await sendEmail(applicantUser.email, emailTemplate);
+    } catch (emailError) {
+      console.error('Failed to send application status email:', emailError);
+    }
+
     // Populate before sending response
     await project.populate([
       { path: 'owner', select: 'firstName lastName email avatar' },
@@ -386,7 +458,6 @@ exports.handleApplication = async (req, res, next) => {
     next(error);
   }
 };
-
 // @desc    Remove member from project
 // @route   DELETE /api/projects/:id/members/:memberId
 // @access  Private (Owner only)
