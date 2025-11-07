@@ -218,4 +218,4 @@ const CommentSection = ({ projectId, taskId = null, fileId = null }) => {
   );
 };
 
-export default Comment
+export default CommentSection;

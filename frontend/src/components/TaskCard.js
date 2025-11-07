@@ -1,11 +1,12 @@
 import React from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { updateTask } from '../redux/slices/taskSlice';
+import { updateTask, updateTasksOptimistically } from '../redux/slices/taskSlice';
 
 const TaskCard = ({ task, onDragStart, onClick, getPriorityColor, canDrag = true }) => {
   const dispatch = useDispatch();
   const { user } = useSelector((state) => state.auth);
   const { currentProject } = useSelector((state) => state.projects);
+  const { groupedTasks } = useSelector((state) => state.tasks);
   
   const isOwner = currentProject?.owner?._id === user.id;
   const isAssignee = task.assignee?._id === user.id;
@@ -21,69 +22,61 @@ const TaskCard = ({ task, onDragStart, onClick, getPriorityColor, canDrag = true
 
   const subtasksProgress = getSubtasksProgress();
 
-const handleQuickComplete = async (e) => {
-  e.stopPropagation();
-  
-  // Get current grouped tasks from parent
-  const { groupedTasks } = useSelector((state) => state.tasks);
-  const dispatch = useDispatch();
-  
-  // Optimistic update
-  const updatedGroupedTasks = { ...groupedTasks };
-  
-  // Remove from current column
-  updatedGroupedTasks[task.status] = updatedGroupedTasks[task.status].filter(
-    (t) => t._id !== task._id
-  );
-  
-  // Add to done column
-  const updatedTask = { ...task, status: 'done' };
-  updatedGroupedTasks.done = [...updatedGroupedTasks.done, updatedTask];
-  
-  // Update state immediately
-  dispatch(updateTasksOptimistically(updatedGroupedTasks));
-  
-  try {
-    await dispatch(updateTask({ 
-      id: task._id, 
-      taskData: { status: 'done' } 
-    })).unwrap();
-  } catch (error) {
-    console.error('Failed to complete task:', error);
-    // Revert will happen on next fetch
-  }
-};
+  const handleQuickComplete = async (e) => {
+    e.stopPropagation();
+    
+    // Optimistic update
+    const updatedGroupedTasks = { ...groupedTasks };
+    
+    // Remove from current column
+    updatedGroupedTasks[task.status] = updatedGroupedTasks[task.status].filter(
+      (t) => t._id !== task._id
+    );
+    
+    // Add to done column
+    const updatedTask = { ...task, status: 'done' };
+    updatedGroupedTasks.done = [...updatedGroupedTasks.done, updatedTask];
+    
+    // Update state immediately
+    dispatch(updateTasksOptimistically(updatedGroupedTasks));
+    
+    try {
+      await dispatch(updateTask({ 
+        id: task._id, 
+        taskData: { status: 'done' } 
+      })).unwrap();
+    } catch (error) {
+      console.error('Failed to complete task:', error);
+    }
+  };
 
-const handleQuickStatusChange = async (e, newStatus) => {
-  e.stopPropagation();
-  
-  const { groupedTasks } = useSelector((state) => state.tasks);
-  const dispatch = useDispatch();
-  
-  // Optimistic update
-  const updatedGroupedTasks = { ...groupedTasks };
-  
-  // Remove from current column
-  updatedGroupedTasks[task.status] = updatedGroupedTasks[task.status].filter(
-    (t) => t._id !== task._id
-  );
-  
-  // Add to new column
-  const updatedTask = { ...task, status: newStatus };
-  updatedGroupedTasks[newStatus] = [...updatedGroupedTasks[newStatus], updatedTask];
-  
-  // Update state immediately
-  dispatch(updateTasksOptimistically(updatedGroupedTasks));
-  
-  try {
-    await dispatch(updateTask({ 
-      id: task._id, 
-      taskData: { status: newStatus } 
-    })).unwrap();
-  } catch (error) {
-    console.error('Failed to update task:', error);
-  }
-};
+  const handleQuickStatusChange = async (e, newStatus) => {
+    e.stopPropagation();
+    
+    // Optimistic update
+    const updatedGroupedTasks = { ...groupedTasks };
+    
+    // Remove from current column
+    updatedGroupedTasks[task.status] = updatedGroupedTasks[task.status].filter(
+      (t) => t._id !== task._id
+    );
+    
+    // Add to new column
+    const updatedTask = { ...task, status: newStatus };
+    updatedGroupedTasks[newStatus] = [...updatedGroupedTasks[newStatus], updatedTask];
+    
+    // Update state immediately
+    dispatch(updateTasksOptimistically(updatedGroupedTasks));
+    
+    try {
+      await dispatch(updateTask({ 
+        id: task._id, 
+        taskData: { status: newStatus } 
+      })).unwrap();
+    } catch (error) {
+      console.error('Failed to update task:', error);
+    }
+  };
 
   return (
     <div
