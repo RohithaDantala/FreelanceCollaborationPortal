@@ -1,7 +1,9 @@
 require('dotenv').config();
 const app = require('./app');
-const connectDB = require('./config/database');
+const http = require('http');
 
+const connectDB = require('./config/database');
+const { initializeSocket } = require('./config/socket');
 // Handle uncaught exceptions
 process.on('uncaughtException', err => {
   console.error('UNCAUGHT EXCEPTION! 💥 Shutting down...');
@@ -11,12 +13,14 @@ process.on('uncaughtException', err => {
 
 // Connect to database
 connectDB();
-
+const server = http.createServer(app);
+initializeSocket(server);
 // Start server
 const PORT = process.env.PORT || 5000;
-const server = app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`🚀 Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
   console.log(`📡 API available at http://localhost:${PORT}/api`);
+  console.log(`🔌 Socket.io initialized`);
 });
 
 // Handle unhandled promise rejections
