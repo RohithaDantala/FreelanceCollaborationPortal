@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-mport CommentSection from '../components/CommentSection';
+import CommentSection from '../components/CommentSection';
 import ProjectChat from '../components/ProjectChat';
 import {
   getProject,
