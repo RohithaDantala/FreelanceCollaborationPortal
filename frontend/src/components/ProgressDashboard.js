@@ -9,13 +9,24 @@ const ProgressDashboard = ({ projectId }) => {
   const { progress, isLoading } = useSelector((state) => state.milestones);
   const { groupedTasks } = useSelector((state) => state.tasks);
 
-  useEffect(() => {
-    if (projectId) {
+useEffect(() => {
+  if (projectId) {
+    // Initial fetch
+    dispatch(getProjectProgress(projectId));
+    dispatch(getProjectTasks(projectId));
+    
+    // ADDED: Auto-refresh every 30 seconds
+    const interval = setInterval(() => {
       dispatch(getProjectProgress(projectId));
       dispatch(getProjectTasks(projectId));
-    }
-    return () => dispatch(reset());
-  }, [dispatch, projectId]);
+    }, 30000);
+    
+    return () => {
+      clearInterval(interval);
+      dispatch(reset());
+    };
+  }
+}, [dispatch, projectId]);
 
   if (isLoading) {
     return (

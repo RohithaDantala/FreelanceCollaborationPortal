@@ -337,18 +337,18 @@ exports.handleApplication = async (req, res, next) => {
       return next(new AppError('Applicant not found', 404));
     }
 
+    // Update applicant status
     applicant.status = status;
 
-    // If accepted, add to members
+    // CRITICAL FIX: Only add to members if accepted AND not already a member
     const isMember = project.members.some(m => m.user.toString() === applicantId);
-    if (status === 'accepted') {  
-      if (!isMember) {
-        project.members.push({
-          user: applicantId,
-          role: 'member',
-          joinedAt: Date.now(),
-        });
-      }
+    
+    if (status === 'accepted' && !isMember) {  
+      project.members.push({
+        user: applicantId,
+        role: 'member',
+        joinedAt: Date.now(),
+      });
     }
 
     await project.save();
@@ -370,6 +370,7 @@ exports.handleApplication = async (req, res, next) => {
       project: project._id,
     });
 
+    // Populate before sending response
     await project.populate([
       { path: 'owner', select: 'firstName lastName email avatar' },
       { path: 'members.user', select: 'firstName lastName avatar' },
@@ -409,14 +410,18 @@ exports.removeMember = async (req, res, next) => {
       return next(new AppError('Cannot remove project owner', 400));
     }
 
+    // Remove from members array
     project.members = project.members.filter(
       m => m.user.toString() !== memberId
     );
 
-    // Also update applicant status if they were accepted
-    const applicant = project.applicants.find(a => a.user.toString() === memberId);
-    if (applicant) {
-      applicant.status = 'removed';
+    // CRITICAL FIX: Update applicant status to 'removed'
+    const applicantIndex = project.applicants.findIndex(
+      a => a.user.toString() === memberId
+    );
+    
+    if (applicantIndex !== -1) {
+      project.applicants[applicantIndex].status = 'removed';
     }
 
     await project.save();
@@ -428,9 +433,16 @@ exports.removeMember = async (req, res, next) => {
       type: 'member_removed',
       title: 'Removed from Project',
       message: `You have been removed from the project "${project.title}"`,
-      link: `/projects/${project._id}`,
+      link: `/projects`,
       project: project._id,
     });
+
+    // Populate before sending response
+    await project.populate([
+      { path: 'owner', select: 'firstName lastName email avatar' },
+      { path: 'members.user', select: 'firstName lastName avatar' },
+      { path: 'applicants.user', select: 'firstName lastName avatar' }
+    ]);
 
     res.status(200).json({
       success: true,

@@ -15,6 +15,7 @@ const Header = () => {
   };
 
   const canCreateProject = user && (user.role === 'project_owner' || user.role === 'admin');
+  const isAdmin = user && user.role === 'admin';
 
   return (
     <header className="bg-white shadow-md sticky top-0 z-50">
@@ -58,6 +59,15 @@ const Header = () => {
                 >
                   My Projects
                 </Link>
+                {/* ADMIN LINK - NEW */}
+                {isAdmin && (
+                  <Link
+                    to="/admin/dashboard"
+                    className="text-red-600 hover:text-red-700 transition-colors font-semibold"
+                  >
+                    ⚡ Admin
+                  </Link>
+                )}
               </>
             )}
           </div>
@@ -85,7 +95,6 @@ const Header = () => {
                   </span>
                 </div>
                 
-                {/* Only show Create Project for project owners and admins */}
                 {canCreateProject && (
                   <Link
                     to="/projects/create"

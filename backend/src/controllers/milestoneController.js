@@ -264,25 +264,37 @@ exports.getProjectProgress = async (req, res, next) => {
     const milestones = await Milestone.find({
       project: projectId,
       isActive: true,
-    });
+    }).populate('tasks');
+
+    // CRITICAL FIX: Recalculate progress for each milestone
+    for (const milestone of milestones) {
+      await milestone.calculateProgress();
+      await milestone.save({ validateBeforeSave: false });
+    }
+
+    // Refresh milestones after calculation
+    const updatedMilestones = await Milestone.find({
+      project: projectId,
+      isActive: true,
+    }).populate('tasks');
 
     // Calculate overall progress
     const overallProgress = await Milestone.getProjectProgress(projectId);
 
     // Get milestone statistics
-    const totalMilestones = milestones.length;
-    const completedMilestones = milestones.filter(
+    const totalMilestones = updatedMilestones.length;
+    const completedMilestones = updatedMilestones.filter(
       (m) => m.status === 'completed'
     ).length;
-    const inProgressMilestones = milestones.filter(
+    const inProgressMilestones = updatedMilestones.filter(
       (m) => m.status === 'in_progress'
     ).length;
-    const overdueMilestones = milestones.filter(
+    const overdueMilestones = updatedMilestones.filter(
       (m) => m.isOverdue && m.status !== 'completed'
     ).length;
 
     // Get upcoming milestones
-    const upcomingMilestones = milestones
+    const upcomingMilestones = updatedMilestones
       .filter((m) => m.status !== 'completed')
       .sort((a, b) => a.dueDate - b.dueDate)
       .slice(0, 5);

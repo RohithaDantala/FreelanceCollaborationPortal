@@ -10,7 +10,7 @@ import {
   clearCurrentProject,
   reset,
 } from '../redux/slices/projectSlice';
-
+import CommentSection from '../components/CommentSection';
 const ProjectDetail = () => {
   const { id } = useParams();
   const dispatch = useDispatch();
@@ -49,6 +49,26 @@ const ProjectDetail = () => {
   
   const applicationStatus = myApplication?.status;
 
+  const isRemoved = applicationStatus === 'removed';
+  if (project && user && !isLoading && !isMember && !isOwner && isRemoved) {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="text-center p-8 bg-white rounded-lg shadow-md max-w-md">
+        <div className="text-6xl mb-4">🚫</div>
+        <h2 className="text-2xl font-bold text-gray-800 mb-2">Access Removed</h2>
+        <p className="text-gray-600 mb-4">
+          You have been removed from this project and no longer have access.
+        </p>
+        <Link
+          to="/projects"
+          className="px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 inline-block"
+        >
+          Browse Other Projects
+        </Link>
+      </div>
+    </div>
+  );
+}
   const handleApply = async () => {
     if (!applicationMessage.trim()) {
       alert('Please write a message explaining why you want to join');
@@ -386,6 +406,12 @@ const ProjectDetail = () => {
                   ))}
                 </div>
               </div>
+                  {/* Comments Section */}
+                {isMember && (
+                  <div className="bg-white rounded-lg shadow-md p-6">
+                    <CommentSection projectId={project._id} />
+                  </div>
+                )}
 
               {/* Applicants (Owner Only) */}
               {isOwner && project.applicants && project.applicants.length > 0 && (
@@ -473,6 +499,12 @@ const ProjectDetail = () => {
                     >
                       📁 View Files
                     </Link>
+                     <Link
+                        to={`/projects/${project._id}/reports`}
+                        className="block w-full px-4 py-3 bg-yellow-50 text-yellow-700 rounded-lg hover:bg-yellow-100 text-center font-medium transition-colors"
+                      >
+                        📊 View Reports
+                      </Link>
                     {isOwner && (
                       <Link
                         to={`/projects/${project._id}/edit`}

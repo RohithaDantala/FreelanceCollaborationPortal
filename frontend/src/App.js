@@ -16,7 +16,7 @@ import MyProjects from './pages/MyProjects';
 import ProjectTasks from './pages/ProjectTasks';
 import ProjectFiles from './pages/ProjectFiles';
 import ProjectMilestones from './pages/ProjectMilestones';
-
+import ProjectMemberRoute from './components/ProjectMemberRoute';
 import PrivateRoute from './components/PrivateRoute';
 import OwnerRoute from './components/OwnerRoute';
 
@@ -134,32 +134,39 @@ function App() {
               } 
             />
             
-            <Route 
-              path="/projects/:id/tasks" 
-              element={
-                <PrivateRoute>
+          <Route 
+            path="/projects/:id/tasks" 
+            element={
+              <PrivateRoute>
+                <ProjectMemberRoute>
                   <ProjectTasks />
-                </PrivateRoute>
-              } 
-            />
-            
-            <Route 
-              path="/projects/:id/files" 
-              element={
-                <PrivateRoute>
+                </ProjectMemberRoute>
+              </PrivateRoute>
+            } 
+          />
+
+          <Route 
+            path="/projects/:id/files" 
+            element={
+              <PrivateRoute>
+                <ProjectMemberRoute>
                   <ProjectFiles />
-                </PrivateRoute>
-              } 
-            />
-            
-            <Route 
-              path="/projects/:id/milestones" 
-              element={
-                <PrivateRoute>
+                </ProjectMemberRoute>
+              </PrivateRoute>
+            } 
+          />
+
+          <Route 
+            path="/projects/:id/milestones" 
+            element={
+              <PrivateRoute>
+                <ProjectMemberRoute>
                   <ProjectMilestones />
-                </PrivateRoute>
-              } 
-            />
+                </ProjectMemberRoute>
+              </PrivateRoute>
+            } 
+          />
+
           </Routes>
         </main>
         

@@ -75,50 +75,52 @@ const KanbanBoard = ({ projectId }) => {
     setDraggedOverColumn(null);
   };
 
-  const handleDrop = async (e, newStatus) => {
-    e.preventDefault();
-    setDraggedOverColumn(null);
+const handleDrop = async (e, newStatus) => {
+  e.preventDefault();
+  setDraggedOverColumn(null);
 
-    if (!draggedTask || draggedTask.status === newStatus) {
-      setDraggedTask(null);
-      return;
-    }
-
-    // Optimistic update
-    const updatedGroupedTasks = { ...groupedTasks };
-    
-    // Remove from old column
-    updatedGroupedTasks[draggedTask.status] = updatedGroupedTasks[
-      draggedTask.status
-    ].filter((t) => t._id !== draggedTask._id);
-
-    // Add to new column
-    updatedGroupedTasks[newStatus] = [
-      ...updatedGroupedTasks[newStatus],
-      { ...draggedTask, status: newStatus },
-    ];
-
-    dispatch(updateTasksOptimistically(updatedGroupedTasks));
-
-    // Update on server
-    try {
-      await dispatch(
-        updateTask({
-          id: draggedTask._id,
-          taskData: { status: newStatus },
-        })
-      ).unwrap();
-      
-      // Refresh tasks to get correct order
-      dispatch(getProjectTasks(projectId));
-    } catch (error) {
-      // Revert on error
-      dispatch(getProjectTasks(projectId));
-    }
-
+  if (!draggedTask || draggedTask.status === newStatus) {
     setDraggedTask(null);
-  };
+    return;
+  }
 
+  // Optimistic update - IMPROVED
+  const updatedGroupedTasks = { ...groupedTasks };
+  
+  // Remove from old column
+  updatedGroupedTasks[draggedTask.status] = updatedGroupedTasks[
+    draggedTask.status
+  ].filter((t) => t._id !== draggedTask._id);
+
+  // Add to new column with updated status
+  const updatedTask = { ...draggedTask, status: newStatus };
+  updatedGroupedTasks[newStatus] = [
+    ...updatedGroupedTasks[newStatus],
+    updatedTask,
+  ];
+
+  // Update state immediately for instant UI feedback
+  dispatch(updateTasksOptimistically(updatedGroupedTasks));
+
+  // Update on server
+  try {
+    await dispatch(
+      updateTask({
+        id: draggedTask._id,
+        taskData: { status: newStatus },
+      })
+    ).unwrap();
+    
+    // SUCCESS: Refresh to get correct order from server
+    await dispatch(getProjectTasks(projectId));
+  } catch (error) {
+    // ERROR: Revert optimistic update
+    console.error('Failed to update task:', error);
+    dispatch(getProjectTasks(projectId));
+  }
+
+  setDraggedTask(null);
+};
   const handleTaskClick = (task) => {
     setSelectedTask(task);
     setShowTaskModal(true);
