@@ -5,9 +5,6 @@ const Milestone = require('../models/Milestone');
 const Notification = require('../models/Notification');
 const { AppError } = require('../middleware/errorHandler');
 
-// NOTE: Stripe integration requires: npm install stripe
-// const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
-
 // @desc    Create payment intent
 // @route   POST /api/payments/create-intent
 // @access  Private (Project Owner)
@@ -24,17 +21,6 @@ exports.createPaymentIntent = async (req, res, next) => {
       return next(new AppError('Only project owner can create payments', 403));
     }
 
-    // In production, integrate with Stripe
-    // const paymentIntent = await stripe.paymentIntents.create({
-    //   amount: amount * 100, // Stripe uses cents
-    //   currency: currency.toLowerCase(),
-    //   metadata: {
-    //     projectId,
-    //     milestoneId,
-    //     recipientId,
-    //   },
-    // });
-
     const payment = await Payment.create({
       project: projectId,
       milestone: milestoneId || null,
@@ -44,7 +30,6 @@ exports.createPaymentIntent = async (req, res, next) => {
       currency,
       status: 'pending',
       description: req.body.description || '',
-      // stripePaymentIntentId: paymentIntent.id,
     });
 
     await payment.populate([
@@ -67,10 +52,7 @@ exports.createPaymentIntent = async (req, res, next) => {
     res.status(201).json({
       success: true,
       message: 'Payment created successfully',
-      data: {
-        payment,
-        // clientSecret: paymentIntent.client_secret,
-      },
+      data: { payment },
     });
   } catch (error) {
     next(error);
@@ -93,7 +75,7 @@ exports.holdInEscrow = async (req, res, next) => {
     }
 
     payment.status = 'held_in_escrow';
-    payment.escrowReleaseDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+    payment.escrowReleaseDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
     await payment.save();
 
     await Notification.createNotification({
@@ -118,7 +100,7 @@ exports.holdInEscrow = async (req, res, next) => {
 
 // @desc    Release payment from escrow
 // @route   POST /api/payments/:id/release
-// @access  Private (Project Owner)
+// @access  Private
 exports.releasePayment = async (req, res, next) => {
   try {
     const payment = await Payment.findById(req.params.id);
@@ -231,7 +213,6 @@ exports.createDispute = async (req, res, next) => {
     };
     await payment.save();
 
-    // Notify other party
     const otherParty =
       payment.payer.toString() === req.user.id ? payment.recipient : payment.payer;
 
@@ -257,7 +238,7 @@ exports.createDispute = async (req, res, next) => {
 
 // @desc    Get project payments
 // @route   GET /api/projects/:projectId/payments
-// @access  Private (Project members)
+// @access  Private
 exports.getProjectPayments = async (req, res, next) => {
   try {
     const { projectId } = req.params;
@@ -285,7 +266,6 @@ exports.getProjectPayments = async (req, res, next) => {
       .sort({ createdAt: -1 });
 
     const count = await Payment.countDocuments(query);
-
     const earnings = await Payment.getProjectEarnings(projectId);
 
     res.status(200).json({
@@ -303,7 +283,7 @@ exports.getProjectPayments = async (req, res, next) => {
   }
 };
 
-// @desc    Get user payments (sent and received)
+// @desc    Get user payments
 // @route   GET /api/payments/my-payments
 // @access  Private
 exports.getMyPayments = async (req, res, next) => {

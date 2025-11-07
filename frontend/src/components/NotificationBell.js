@@ -87,6 +87,11 @@ const NotificationBell = () => {
       deliverable_reviewed: '👀',
       project_updated: '🔄',
       comment_mention: '💬',
+      payment_created: '💰',
+      payment_escrowed: '🔒',
+      payment_released: '✅',
+      payment_refunded: '↩️',
+      payment_disputed: '⚠️',
     };
     return icons[type] || '🔔';
   };
