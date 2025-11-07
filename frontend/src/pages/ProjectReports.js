@@ -8,7 +8,11 @@ const ProjectReports = () => {
   const { user } = useSelector((state) => state.auth);
   const [reports, setReports] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [generating, setGenerating] = useState(false);
+  const [generating, setGenerating] = useState({
+    contribution: false,
+    milestone: false,
+    summary: false,
+  });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [dateRange, setDateRange] = useState({
