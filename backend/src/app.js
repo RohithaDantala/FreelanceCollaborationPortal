@@ -45,13 +45,13 @@ try {
   app.use('/api/projects', require('./routes/projectRoutes'));
   app.use('/api', require('./routes/taskRoutes')); // Task routes
   app.use('/api', require('./routes/fileRoutes')); // File routes
-  app.use('/api/notifications', require('./routes/notificationRoutes')); // Notification routes
+  app.use('/api/notifications', require('./routes/notificationRoutes'));
   app.use('/api', require('./routes/milestoneRoutes'));
-  app.use('/api/admin', require('./routes/adminRoutes')); // Admin routes
+  app.use('/api/admin', require('./routes/adminRoutes'));
   app.use('/api/reports', require('./routes/reportRoutes'));
   app.use('/api/comments', require('./routes/commentRoutes'));
-  app.use('/api', require('./routes/messageRoutes'));
-  app.use('/api/payments', require('./routes/paymentRoutes'));
+  app.use('/api', require('./routes/messageRoutes')); // Message routes
+  app.use('/api/payments', require('./routes/paymentRoutes')); // Payment routes
 } catch (error) {
   console.warn('⚠️ Some routes not found — create them under src/routes/');
 }

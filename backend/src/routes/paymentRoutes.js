@@ -1,34 +1,28 @@
 const express = require('express');
 const {
-  createProject,
-  getAllProjects,
-  getProject,
-  getMyProjects,
-  updateProject,
-  deleteProject,
-  applyToProject,
-  handleApplication,
-  removeMember,
-} = require('../controllers/projectController');
-const { protect, authorize } = require('../middleware/auth');
-const { getProjectPayments } = require('../controllers/paymentController');
+  createPaymentIntent,
+  holdInEscrow,
+  releasePayment,
+  requestRefund,
+  createDispute,
+  getProjectPayments,
+  getMyPayments,
+} = require('../controllers/paymentController');
+const { protect } = require('../middleware/auth');
 
 const router = express.Router();
 
-// Public routes
-router.get('/', getAllProjects);
-router.get('/:id', getProject);
+// All routes require authentication
+router.use(protect);
 
-// Protected routes
-router.post('/', protect, createProject);
-router.get('/user/my-projects', protect, getMyProjects);
-router.put('/:id', protect, updateProject);
-router.delete('/:id', protect, deleteProject);
-router.post('/:id/apply', protect, applyToProject);
-router.put('/:id/applicants/:applicantId', protect, handleApplication);
-router.delete('/:id/members/:memberId', protect, removeMember);
+// Payment operations
+router.post('/create-intent', createPaymentIntent);
+router.post('/:id/escrow', holdInEscrow);
+router.post('/:id/release', releasePayment);
+router.post('/:id/refund', requestRefund);
+router.post('/:id/dispute', createDispute);
 
-// Payment routes
-router.get('/:projectId/payments', protect, getProjectPayments);
+// Get payments
+router.get('/my-payments', getMyPayments);
 
 module.exports = router;

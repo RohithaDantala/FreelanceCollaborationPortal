@@ -6,10 +6,8 @@ const CreateTaskModal = ({ projectId, initialStatus, onClose, onSuccess }) => {
   const dispatch = useDispatch();
   const { currentProject } = useSelector((state) => state.projects);
   const { user } = useSelector((state) => state.auth);
-  const isOwner = currentProject?.owner?._id === user.id;
-    if (!isOwner) {
-    return null;
-  }
+  
+  // ALL HOOKS MUST BE CALLED BEFORE ANY CONDITIONAL RETURNS
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -23,6 +21,14 @@ const CreateTaskModal = ({ projectId, initialStatus, onClose, onSuccess }) => {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
+
+  // NOW we can check authorization AFTER all hooks
+  const isOwner = currentProject?.owner?._id === user.id;
+  
+  // Early return is now safe because all hooks have been called
+  if (!isOwner) {
+    return null;
+  }
 
   const handleChange = (e) => {
     const { name, value } = e.target;
