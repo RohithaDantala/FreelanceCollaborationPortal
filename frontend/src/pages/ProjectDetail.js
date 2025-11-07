@@ -227,6 +227,27 @@ const ProjectDetail = () => {
                       <span>Files</span>
                     </Link>
                   )}
+                  {/* Payments button for all members */}
+                  {isMember && (
+                    <Link
+                      to={`/projects/${project._id}/payments`}
+                      className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 flex items-center gap-2"
+                    >
+                      <span>💰</span>
+                      <span>Payments</span>
+                    </Link>
+                  )}
+
+                  {/* Messages/Chat button for all members */}
+                  {isMember && (
+                    <a
+                      href={`#chat-section`}
+                      className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center gap-2"
+                    >
+                      <span>💬</span>
+                      <span>Chat</span>
+                    </a>
+                  )}
                   
                   {isOwner && (
                     <>
