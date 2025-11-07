@@ -17,6 +17,7 @@ import ProjectTasks from './pages/ProjectTasks';
 import ProjectFiles from './pages/ProjectFiles';
 import ProjectMilestones from './pages/ProjectMilestones';
 import ProjectReports from './pages/ProjectReports';
+import ProjectPayments from './pages/ProjectPayments';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminUsers from './pages/AdminUsers';
 import ProjectMemberRoute from './components/ProjectMemberRoute';
@@ -171,6 +172,16 @@ function App() {
                 </PrivateRoute>
               } 
             />
+            <Route
+                path="/projects/:id/payments"
+                element={
+                  <PrivateRoute>
+                    <ProjectMemberRoute>
+                      <ProjectPayments />
+                    </ProjectMemberRoute>
+                  </PrivateRoute>
+                }
+              />
 
             {/* NEW: Reports Route */}
             <Route 

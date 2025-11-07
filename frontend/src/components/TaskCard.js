@@ -7,8 +7,9 @@ const TaskCard = ({ task, onDragStart, onClick, getPriorityColor, canDrag = true
   const { user } = useSelector((state) => state.auth);
   const { currentProject } = useSelector((state) => state.projects);
   const { groupedTasks } = useSelector((state) => state.tasks);
-  const canDragTask = isOwner && canDrag;
   const isOwner = currentProject?.owner?._id === user.id;
+
+  const canDragTask = isOwner && canDrag;
   const isAssignee = task.assignee?._id === user.id;
   const isOverdue = task.deadline && new Date(task.deadline) < new Date() && task.status !== 'done';
   
