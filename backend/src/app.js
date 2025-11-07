@@ -47,6 +47,8 @@ try {
   app.use('/api', require('./routes/fileRoutes')); // File routes
   app.use('/api/notifications', require('./routes/notificationRoutes')); // Notification routes
   app.use('/api', require('./routes/milestoneRoutes'));
+  app.use('/api/admin', require('./routes/adminRoutes')); // Admin routes
+  app.use('/api/reports', require('./routes/reportRoutes'));
 } catch (error) {
   console.warn('⚠️ Some routes not found — create them under src/routes/');
 }
