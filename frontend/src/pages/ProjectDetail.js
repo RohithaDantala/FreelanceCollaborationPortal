@@ -192,109 +192,120 @@ const ProjectDetail = () => {
                 </div>
                 <p className="text-gray-600 capitalize">{getCategoryLabel(project.category)}</p>
               </div>
+              // REPLACE lines 95-145 in frontend/src/pages/ProjectDetail.js with this:
 
-                {/* Action Buttons */}
-                <div className="flex gap-2 flex-wrap">
-                  {/* Tasks button for all members */}
-                  {isMember && (
+              {/* Action Buttons - FIXED AND REORGANIZED */}
+              <div className="flex gap-2 flex-wrap">
+                {/* ALL MEMBERS CAN SEE THESE */}
+                {isMember && (
+                  <>
                     <Link
                       to={`/projects/${project._id}/tasks`}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2 shadow-md hover:shadow-lg transition-all"
                     >
                       <span>📋</span>
                       <span>Tasks</span>
                     </Link>
-                  )}
 
-                  {/* Milestones button for all members */}
-                  {isMember && (
                     <Link
                       to={`/projects/${project._id}/milestones`}
-                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2"
+                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2 shadow-md hover:shadow-lg transition-all"
                     >
                       <span>🎯</span>
                       <span>Milestones</span>
                     </Link>
-                  )}
 
-                  {/* Files button for all members */}
-                  {isMember && (
                     <Link
                       to={`/projects/${project._id}/files`}
-                      className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 flex items-center gap-2"
+                      className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 flex items-center gap-2 shadow-md hover:shadow-lg transition-all"
                     >
                       <span>📁</span>
                       <span>Files</span>
                     </Link>
-                  )}
-                  {/* Payments button for all members */}
-                  {isMember && (
+
+                    {/* 🔥 PAYMENT BUTTON - NOW VISIBLE */}
                     <Link
                       to={`/projects/${project._id}/payments`}
-                      className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 flex items-center gap-2"
+                      className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 flex items-center gap-2 shadow-md hover:shadow-lg transition-all"
                     >
                       <span>💰</span>
                       <span>Payments</span>
                     </Link>
-                  )}
 
-                  {/* Messages/Chat button for all members */}
-                  {isMember && (
+                    {/* 🔥 MESSAGES/CHAT BUTTON - NOW VISIBLE */}
                     <a
-                      href={`#chat-section`}
-                      className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center gap-2"
+                      href="#chat-section"
+                      className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center gap-2 shadow-md hover:shadow-lg transition-all"
                     >
                       <span>💬</span>
-                      <span>Chat</span>
+                      <span>Messages</span>
                     </a>
-                  )}
-                  
-                  {isOwner && (
-                    <>
-                      <Link
-                        to={`/projects/${project._id}/edit`}
-                        className="px-4 py-2 border border-primary-600 text-primary-600 rounded-lg hover:bg-primary-50"
-                      >
-                        ✏️ Edit
-                      </Link>
-                      <button
-                        onClick={handleDeleteProject}
-                        className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
-                      >
-                        🗑️ Delete
-                      </button>
-                    </>
-                  )}
 
-                  {/* Application Status Display */}
-                  {!isOwner && !isMember && !myApplication && project.status === 'open' && (
-                    <button
-                      onClick={() => setShowApplicationModal(true)}
-                      className="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 font-medium"
+                    <Link
+                      to={`/projects/${project._id}/reports`}
+                      className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 flex items-center gap-2 shadow-md hover:shadow-lg transition-all"
                     >
-                      Apply to Join
+                      <span>📊</span>
+                      <span>Reports</span>
+                    </Link>
+                  </>
+                )}
+                
+                {/* OWNER-ONLY BUTTONS */}
+                {isOwner && (
+                  <>
+                    <Link
+                      to={`/projects/${project._id}/edit`}
+                      className="px-4 py-2 border-2 border-primary-600 text-primary-600 rounded-lg hover:bg-primary-50 shadow-md hover:shadow-lg transition-all"
+                    >
+                      ✏️ Edit
+                    </Link>
+                    <button
+                      onClick={handleDeleteProject}
+                      className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 shadow-md hover:shadow-lg transition-all"
+                    >
+                      🗑️ Delete
                     </button>
-                  )}
+                  </>
+                )}
 
-                  {!isOwner && !isMember && myApplication && applicationStatus === 'pending' && (
-                    <span className="px-6 py-2 bg-yellow-100 text-yellow-800 rounded-lg flex items-center gap-2 font-medium">
-                      <span className="animate-pulse">⏳</span>
-                      Application Pending
-                    </span>
-                  )}
+                {/* APPLICATION BUTTONS FOR NON-MEMBERS */}
+                {!isOwner && !isMember && !myApplication && project.status === 'open' && (
+                  <button
+                    onClick={() => setShowApplicationModal(true)}
+                    className="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 font-medium shadow-lg hover:shadow-xl transition-all"
+                  >
+                    Apply to Join
+                  </button>
+                )}
 
-                  {!isMember && myApplication && applicationStatus === 'accepted' && (
-                    <span className="px-6 py-2 bg-green-100 text-green-800 rounded-lg font-medium">
-                      ✅ Application Accepted
-                    </span>
-                  )}
+                {!isOwner && !isMember && myApplication && applicationStatus === 'pending' && (
+                  <span className="px-6 py-2 bg-yellow-100 text-yellow-800 rounded-lg flex items-center gap-2 font-medium border-2 border-yellow-300">
+                    <span className="animate-pulse">⏳</span>
+                    Application Pending
+                  </span>
+                )}
 
-                  {!isMember && myApplication && applicationStatus === 'rejected' && (
-                    <span className="px-6 py-2 bg-red-100 text-red-800 rounded-lg font-medium">
-                      ❌ Application Rejected
-                    </span>
-                  )}
+                {!isMember && myApplication && applicationStatus === 'accepted' && (
+                  <span className="px-6 py-2 bg-green-100 text-green-800 rounded-lg font-medium border-2 border-green-300">
+                    ✅ Application Accepted
+                  </span>
+                )}
+
+                {!isMember && myApplication && applicationStatus === 'rejected' && (
+                  <span className="px-6 py-2 bg-red-100 text-red-800 rounded-lg font-medium border-2 border-red-300">
+                    ❌ Application Rejected
+                  </span>
+                )}
+              </div>
+
+              {/* ADD THIS BEFORE THE CLOSING </div> AT THE END OF THE FILE - CHAT SECTION */}
+              {isMember && (
+                <div id="chat-section" className="mt-8">
+                  <ProjectChat projectId={project._id} />
                 </div>
+              )}
+
             </div>
 
             {/* Project Owner */}
