@@ -50,6 +50,7 @@ try {
   app.use('/api/admin', require('./routes/adminRoutes')); // Admin routes
   app.use('/api/reports', require('./routes/reportRoutes'));
   app.use('/api/comments', require('./routes/commentRoutes'));
+  app.use('/api', require('./routes/messageRoutes'));
 } catch (error) {
   console.warn('⚠️ Some routes not found — create them under src/routes/');
 }
