@@ -7,7 +7,7 @@ const TaskCard = ({ task, onDragStart, onClick, getPriorityColor, canDrag = true
   const { user } = useSelector((state) => state.auth);
   const { currentProject } = useSelector((state) => state.projects);
   const { groupedTasks } = useSelector((state) => state.tasks);
-  
+  const canDragTask = isOwner && canDrag;
   const isOwner = currentProject?.owner?._id === user.id;
   const isAssignee = task.assignee?._id === user.id;
   const isOverdue = task.deadline && new Date(task.deadline) < new Date() && task.status !== 'done';
@@ -80,7 +80,7 @@ const TaskCard = ({ task, onDragStart, onClick, getPriorityColor, canDrag = true
 
   return (
     <div
-      draggable={canDrag}
+      draggable={canDragTask}
       onDragStart={(e) => onDragStart(e, task)}
       onClick={() => onClick(task)}
       className="bg-white rounded-lg p-3 shadow-sm hover:shadow-md transition-shadow cursor-pointer border border-gray-200 group"

@@ -12,7 +12,6 @@ import {
   clearCurrentProject,
   reset,
 } from '../redux/slices/projectSlice';
-import CommentSection from '../components/CommentSection';
 const ProjectDetail = () => {
   const { id } = useParams();
   const dispatch = useDispatch();

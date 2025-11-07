@@ -99,7 +99,7 @@ paymentSchema.statics.getProjectEarnings = async function(projectId) {
   const result = await this.aggregate([
     {
       $match: {
-        project: mongoose.Types.ObjectId(projectId),
+        project: new mongoose.Types.ObjectId(projectId),
         status: { $in: ['released', 'held_in_escrow'] },
       },
     },

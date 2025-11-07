@@ -91,7 +91,7 @@ reviewSchema.virtual('averageCategoryRating').get(function () {
 // Static method to calculate user's average rating
 reviewSchema.statics.getUserAverageRating = async function (userId) {
   const result = await this.aggregate([
-    { $match: { reviewee: mongoose.Types.ObjectId(userId), isPublic: true } },
+    { $match: { reviewee: new mongoose.Types.ObjectId(userId), isPublic: true } },
     {
       $group: {
         _id: null,

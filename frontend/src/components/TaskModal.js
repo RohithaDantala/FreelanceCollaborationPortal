@@ -11,7 +11,7 @@ const TaskModal = ({ task, projectId, onClose, onDelete, onUpdate }) => {
   const dispatch = useDispatch();
   const { currentProject } = useSelector((state) => state.projects);
   const { user } = useSelector((state) => state.auth);
-
+  const isOwner = currentProject?.owner?._id === user?.id;  
   const isOwner = currentProject?.owner?._id === user.id;
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({
