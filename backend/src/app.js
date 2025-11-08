@@ -10,13 +10,14 @@ const app = express();
 // Security middleware
 app.use(helmet());
 
-// CORS configuration with proper logging
+// CORS configuration - FIXED FOR VERCEL FRONTEND
 const allowedOrigins = [
-  process.env.CLIENT_URL, // Your frontend URL
+  'https://freelance-collaboration-portal.vercel.app', // YOUR VERCEL FRONTEND
   'https://freelancer-collaboration-portal.onrender.com', // Backend URL
   'http://localhost:3000',
   'http://localhost:5173',
   'http://localhost:5000',
+  process.env.CLIENT_URL, // Additional env variable
 ].filter(url => url && url.trim()); // Remove undefined/empty values
 
 console.log('🔐 Allowed CORS origins:', allowedOrigins);
@@ -25,10 +26,17 @@ const corsOptions = {
   origin: function (origin, callback) {
     // Allow requests with no origin (mobile apps, curl, Postman, server-to-server)
     if (!origin) {
+      console.log('✅ Allowing request with no origin');
       return callback(null, true);
     }
     
-    if (allowedOrigins.includes(origin)) {
+    // Check if origin is in allowed list or is a Vercel deployment
+    const isAllowed = allowedOrigins.some(allowedOrigin => {
+      return origin === allowedOrigin || origin.endsWith('.vercel.app');
+    });
+    
+    if (isAllowed) {
+      console.log('✅ CORS allowed for:', origin);
       callback(null, true);
     } else {
       console.warn('❌ Blocked by CORS:', origin);
@@ -37,10 +45,17 @@ const corsOptions = {
     }
   },
   credentials: true,
-  optionsSuccessStatus: 200,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
+  exposedHeaders: ['Content-Range', 'X-Content-Range'],
+  preflightContinue: false,
+  optionsSuccessStatus: 204,
 };
 
 app.use(cors(corsOptions));
+
+// Explicitly handle preflight requests
+app.options('*', cors(corsOptions));
 
 // Body parser middleware
 app.use(express.json({ limit: '10mb' }));
@@ -78,6 +93,7 @@ app.get('/api/health', (req, res) => {
     message: 'Server is running',
     environment: process.env.NODE_ENV,
     timestamp: new Date().toISOString(),
+    corsOrigins: allowedOrigins,
   });
 });
 
