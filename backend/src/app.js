@@ -54,7 +54,6 @@ try {
   app.use('/api/comments', require('./routes/commentRoutes'));
   app.use('/api', require('./routes/messageRoutes')); // Message routes
   app.use('/api/payments', require('./routes/paymentRoutes')); // Payment routes
-  app.use('/api', require('./routes/timeRoutes')); // Time tracking routes
 app.use('/api/time-tracking', timeTrackingRoutes);
   
 } catch (error) {

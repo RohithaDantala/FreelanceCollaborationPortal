@@ -16,11 +16,13 @@ const router = express.Router();
 
 // Public routes
 router.get('/', getAllProjects);
-router.get('/:id', getProject);
 
-// Protected routes
+// Protected routes - FIX: Move specific routes before dynamic /:id
 router.post('/', protect, createProject);
-router.get('/user/my-projects', protect, getMyProjects);
+router.get('/user/my-projects', protect, getMyProjects); // FIX: Moved before /:id
+
+// Dynamic routes (must come after specific routes)
+router.get('/:id', getProject);
 router.put('/:id', protect, updateProject);
 router.delete('/:id', protect, deleteProject);
 router.post('/:id/apply', protect, applyToProject);

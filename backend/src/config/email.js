@@ -178,45 +178,45 @@ const emailTemplates = {
     `,
   }),
 
-  deadlineReminder: ({ userName, projectTitle, deadline, daysLeft }) => ({
-    subject: `⏰ Reminder: "${projectTitle}" deadline approaching`,
-    html: `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <style>
-          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
-          .content { background: #f9fafb; padding: 30px; border-radius: 0 0 10px 10px; }
-          .warning-box { background: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; margin: 20px 0; border-radius: 5px; }
-          .button { display: inline-block; padding: 12px 30px; background: #f59e0b; color: white; text-decoration: none; border-radius: 5px; margin: 20px 0; }
-          .footer { text-align: center; padding: 20px; color: #6b7280; font-size: 14px; }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="header">
-            <h1>⏰ Deadline Reminder</h1>
-          </div>
-          <div class="content">
-            <p>Hi ${userName},</p>
-            <div class="warning-box">
-              <p><strong>Project:</strong> "${projectTitle}"</p>
-              <p><strong>Deadline:</strong> ${deadline}</p>
-              <p><strong>Time Remaining:</strong> ${daysLeft} day${daysLeft !== 1 ? 's' : ''}</p>
-            </div>
-            <p>The deadline is approaching! Make sure you're on track to complete your deliverables on time.</p>
-            <a href="${process.env.CLIENT_URL}/projects/${projectId}" class="button">View Project</a>
-          </div>
-          <div class="footer">
-            <p>© ${new Date().getFullYear()} FreelanceHub. All rights reserved.</p>
-          </div>
+deadlineReminder: ({ userName, projectTitle, deadline, daysLeft, projectId }) => ({ // FIX: Add projectId
+  subject: `⏰ Reminder: "${projectTitle}" deadline approaching`,
+  html: `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+        .content { background: #f9fafb; padding: 30px; border-radius: 0 0 10px 10px; }
+        .warning-box { background: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; margin: 20px 0; border-radius: 5px; }
+        .button { display: inline-block; padding: 12px 30px; background: #f59e0b; color: white; text-decoration: none; border-radius: 5px; margin: 20px 0; }
+        .footer { text-align: center; padding: 20px; color: #6b7280; font-size: 14px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>⏰ Deadline Reminder</h1>
         </div>
-      </body>
-      </html>
-    `,
-  }),
+        <div class="content">
+          <p>Hi ${userName},</p>
+          <div class="warning-box">
+            <p><strong>Project:</strong> "${projectTitle}"</p>
+            <p><strong>Deadline:</strong> ${deadline}</p>
+            <p><strong>Time Remaining:</strong> ${daysLeft} day${daysLeft !== 1 ? 's' : ''}</p>
+          </div>
+          <p>The deadline is approaching! Make sure you're on track to complete your deliverables on time.</p>
+          <a href="${process.env.CLIENT_URL}/projects/${projectId}" class="button">View Project</a>
+        </div>
+        <div class="footer">
+          <p>© ${new Date().getFullYear()} FreelanceHub. All rights reserved.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `,
+}),
 
   interviewScheduled: ({ userName, projectTitle, date, time, meetingLink }) => ({
     subject: `📅 Interview Scheduled for "${projectTitle}"`,

@@ -1,6 +1,7 @@
 // backend/src/controllers/timeTrackingController.js
-const TimeEntry = require('../models/TimeEntry');
+const TimeEntry = require('../models/TimeTracking');
 const Project = require('../models/Project');
+const mongoose = require('mongoose');
 
 // Start a new timer
 exports.startTimer = async (req, res) => {
