@@ -12,6 +12,7 @@ import {
   clearCurrentProject,
   reset,
 } from '../redux/slices/projectSlice';
+
 const ProjectDetail = () => {
   const { id } = useParams();
   const dispatch = useDispatch();
@@ -51,25 +52,27 @@ const ProjectDetail = () => {
   const applicationStatus = myApplication?.status;
 
   const isRemoved = applicationStatus === 'removed';
+  
   if (project && user && !isLoading && !isMember && !isOwner && isRemoved) {
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="text-center p-8 bg-white rounded-lg shadow-md max-w-md">
-        <div className="text-6xl mb-4">🚫</div>
-        <h2 className="text-2xl font-bold text-gray-800 mb-2">Access Removed</h2>
-        <p className="text-gray-600 mb-4">
-          You have been removed from this project and no longer have access.
-        </p>
-        <Link
-          to="/projects"
-          className="px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 inline-block"
-        >
-          Browse Other Projects
-        </Link>
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center p-8 bg-white rounded-lg shadow-md max-w-md">
+          <div className="text-6xl mb-4">🚫</div>
+          <h2 className="text-2xl font-bold text-gray-800 mb-2">Access Removed</h2>
+          <p className="text-gray-600 mb-4">
+            You have been removed from this project and no longer have access.
+          </p>
+          <Link
+            to="/projects"
+            className="px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 inline-block"
+          >
+            Browse Other Projects
+          </Link>
+        </div>
       </div>
-    </div>
-  );
-}
+    );
+  }
+
   const handleApply = async () => {
     if (!applicationMessage.trim()) {
       alert('Please write a message explaining why you want to join');
@@ -193,89 +196,89 @@ const ProjectDetail = () => {
                 <p className="text-gray-600 capitalize">{getCategoryLabel(project.category)}</p>
               </div>
 
-                {/* Action Buttons */}
-                <div className="flex gap-2 flex-wrap">
-                  {/* Member links */}
-                  {isMember && (
-                    <>
-                      <Link
-                        to={`/projects/${project._id}/tasks`}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
-                      >
-                        <span>📋</span>
-                        <span>Tasks</span>
-                      </Link>
-                      <Link
-                        to={`/projects/${project._id}/milestones`}
-                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2"
-                      >
-                        <span>🎯</span>
-                        <span>Milestones</span>
-                      </Link>
-                      <Link
-                        to={`/projects/${project._id}/files`}
-                        className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 flex items-center gap-2"
-                      >
-                        <span>📁</span>
-                        <span>Files</span>
-                      </Link>
-                      <Link
-                        to={`/projects/${project._id}/payments`}
-                        className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center gap-2"
-                      >
-                        <span>💳</span>
-                        <span>Payments</span>
-                      </Link>
-                    </>
-                  )}
-
-                  {/* Owner controls */}
-                  {isOwner && (
-                    <>
-                      <Link
-                        to={`/projects/${project._id}/edit`}
-                        className="px-4 py-2 border border-primary-600 text-primary-600 rounded-lg hover:bg-primary-50"
-                      >
-                        ✏️ Edit
-                      </Link>
-                      <button
-                        onClick={handleDeleteProject}
-                        className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
-                      >
-                        🗑️ Delete
-                      </button>
-                    </>
-                  )}
-
-                  {/* Application Status Display */}
-                  {!isOwner && !isMember && !myApplication && project.status === 'open' && (
-                    <button
-                      onClick={() => setShowApplicationModal(true)}
-                      className="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 font-medium"
+              {/* Action Buttons */}
+              <div className="flex gap-2 flex-wrap">
+                {/* Member links */}
+                {isMember && (
+                  <>
+                    <Link
+                      to={`/projects/${project._id}/tasks`}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
                     >
-                      Apply to Join
+                      <span>📋</span>
+                      <span>Tasks</span>
+                    </Link>
+                    <Link
+                      to={`/projects/${project._id}/milestones`}
+                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2"
+                    >
+                      <span>🎯</span>
+                      <span>Milestones</span>
+                    </Link>
+                    <Link
+                      to={`/projects/${project._id}/files`}
+                      className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 flex items-center gap-2"
+                    >
+                      <span>📁</span>
+                      <span>Files</span>
+                    </Link>
+                    <Link
+                      to={`/projects/${project._id}/payments`}
+                      className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center gap-2"
+                    >
+                      <span>💳</span>
+                      <span>Payments</span>
+                    </Link>
+                  </>
+                )}
+
+                {/* Owner controls */}
+                {isOwner && (
+                  <>
+                    <Link
+                      to={`/projects/${project._id}/edit`}
+                      className="px-4 py-2 border border-primary-600 text-primary-600 rounded-lg hover:bg-primary-50"
+                    >
+                      ✏️ Edit
+                    </Link>
+                    <button
+                      onClick={handleDeleteProject}
+                      className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                    >
+                      🗑️ Delete
                     </button>
-                  )}
+                  </>
+                )}
 
-                  {!isOwner && !isMember && myApplication && applicationStatus === 'pending' && (
-                    <span className="px-6 py-2 bg-yellow-100 text-yellow-800 rounded-lg flex items-center gap-2 font-medium">
-                      <span className="animate-pulse">⏳</span>
-                      Application Pending
-                    </span>
-                  )}
+                {/* Application Status Display */}
+                {!isOwner && !isMember && !myApplication && project.status === 'open' && (
+                  <button
+                    onClick={() => setShowApplicationModal(true)}
+                    className="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 font-medium"
+                  >
+                    Apply to Join
+                  </button>
+                )}
 
-                  {!isMember && myApplication && applicationStatus === 'accepted' && (
-                    <span className="px-6 py-2 bg-green-100 text-green-800 rounded-lg font-medium">
-                      ✅ Application Accepted
-                    </span>
-                  )}
+                {!isOwner && !isMember && myApplication && applicationStatus === 'pending' && (
+                  <span className="px-6 py-2 bg-yellow-100 text-yellow-800 rounded-lg flex items-center gap-2 font-medium">
+                    <span className="animate-pulse">⏳</span>
+                    Application Pending
+                  </span>
+                )}
 
-                  {!isMember && myApplication && applicationStatus === 'rejected' && (
-                    <span className="px-6 py-2 bg-red-100 text-red-800 rounded-lg font-medium">
-                      ❌ Application Rejected
-                    </span>
-                  )}
-                </div>
+                {!isMember && myApplication && applicationStatus === 'accepted' && (
+                  <span className="px-6 py-2 bg-green-100 text-green-800 rounded-lg font-medium">
+                    ✅ Application Accepted
+                  </span>
+                )}
+
+                {!isMember && myApplication && applicationStatus === 'rejected' && (
+                  <span className="px-6 py-2 bg-red-100 text-red-800 rounded-lg font-medium">
+                    ❌ Application Rejected
+                  </span>
+                )}
+              </div>
             </div>
 
             {/* Project Owner */}
@@ -409,12 +412,13 @@ const ProjectDetail = () => {
                   ))}
                 </div>
               </div>
-                  {/* Comments Section */}
-                {isMember && (
-                  <div className="bg-white rounded-lg shadow-md p-6">
-                    <CommentSection projectId={project._id} />
-                  </div>
-                )}
+
+              {/* Comments Section */}
+              {isMember && (
+                <div className="bg-white rounded-lg shadow-md p-6">
+                  <CommentSection projectId={project._id} />
+                </div>
+              )}
 
               {/* Applicants (Owner Only) */}
               {isOwner && project.applicants && project.applicants.length > 0 && (
@@ -477,45 +481,60 @@ const ProjectDetail = () => {
                             </button>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      ))}
                   </div>
                 </div>
               )}
+            </div>
 
-            {/* Project Info */}
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h2 className="text-lg font-semibold text-gray-800 mb-4">Project Details</h2>
-              <div className="space-y-3">
-                {project.budget && (project.budget.min > 0 || project.budget.max > 0) && (
+            {/* Sidebar - Project Info */}
+            <div className="lg:col-span-1">
+              <div className="bg-white rounded-lg shadow-md p-6">
+                <h2 className="text-lg font-semibold text-gray-800 mb-4">Project Details</h2>
+                <div className="space-y-3">
+                  {project.budget && (project.budget.min > 0 || project.budget.max > 0) && (
+                    <div>
+                      <p className="text-sm text-gray-500">Budget</p>
+                      <p className="font-medium text-gray-800">
+                        ${project.budget.min} - ${project.budget.max} {project.budget.currency}
+                      </p>
+                    </div>
+                  )}
+                  {project.timeline?.estimatedDuration && (
+                    <div>
+                      <p className="text-sm text-gray-500">Duration</p>
+                      <p className="font-medium text-gray-800">
+                        {project.timeline.estimatedDuration}
+                      </p>
+                    </div>
+                  )}
                   <div>
-                    <p className="text-sm text-gray-500">Budget</p>
+                    <p className="text-sm text-gray-500">Created</p>
                     <p className="font-medium text-gray-800">
-                      ${project.budget.min} - ${project.budget.max} {project.budget.currency}
+                      {new Date(project.createdAt).toLocaleDateString()}
                     </p>
                   </div>
-                )}
-                {project.timeline?.estimatedDuration && (
                   <div>
-                    <p className="text-sm text-gray-500">Duration</p>
+                    <p className="text-sm text-gray-500">Last Updated</p>
                     <p className="font-medium text-gray-800">
-                      {project.timeline.estimatedDuration}
+                      {new Date(project.updatedAt).toLocaleDateString()}
                     </p>
                   </div>
-                )}
-                <div>
-                  <p className="text-sm text-gray-500">Created</p>
-                  <p className="font-medium text-gray-800">
-                    {new Date(project.createdAt).toLocaleDateString()}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500">Last Updated</p>
-                  <p className="font-medium text-gray-800">
-                    {new Date(project.updatedAt).toLocaleDateString()}
-                  </p>
                 </div>
               </div>
+
+              {/* ProjectChat Component - Only for members */}
+              {isMember && (
+                <div className="mt-6">
+                  <ProjectChat projectId={project._id} />
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Application Modal */}
       {showApplicationModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
