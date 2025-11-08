@@ -1,4 +1,4 @@
-// backend/src/server.js - FIXED
+
 require('dotenv').config();
 const app = require('./app');
 const http = require('http');
@@ -18,17 +18,46 @@ connectDB();
 // Create HTTP server
 const server = http.createServer(app);
 
-// Initialize Socket.io with the chat socket handler
+// ✅ FIX: Initialize Socket.io with proper CORS
 const socketIO = require('socket.io');
+
+const allowedOrigins = [
+  'https://freelance-collaboration-portal.vercel.app',
+  'http://localhost:3000',
+  'http://localhost:5173',
+  process.env.CLIENT_URL,
+].filter(url => url && url.trim());
+
 const io = socketIO(server, {
   cors: {
-    origin: process.env.CLIENT_URL || 'http://localhost:3000',
+    origin: function (origin, callback) {
+      // Allow requests with no origin (mobile apps, Postman, etc.)
+      if (!origin) return callback(null, true);
+      
+      // Check if origin is allowed or is a Vercel deployment
+      const isAllowed = allowedOrigins.some(allowedOrigin => {
+        return origin === allowedOrigin || origin.endsWith('.vercel.app');
+      });
+      
+      if (isAllowed) {
+        callback(null, true);
+      } else {
+        console.warn('❌ Socket.io blocked origin:', origin);
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
     methods: ['GET', 'POST'],
     credentials: true,
+    allowedHeaders: ['Content-Type', 'Authorization'],
   },
+  pingTimeout: 60000,
+  pingInterval: 25000,
+  transports: ['websocket', 'polling'], // Allow both transports
 });
 
-// Use the chatSocket handler (the better implementation)
+console.log('🔐 Socket.io CORS origins:', allowedOrigins);
+
+// ✅ FIX: Use the chat socket handler with corrected imports
 require('../sockets/chatSocket')(io);
 
 // Start server
@@ -36,7 +65,7 @@ const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
   console.log(`✅ Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
   console.log(`📡 API available at http://localhost:${PORT}/api`);
-  console.log(`🔌 Socket.io initialized`);
+  console.log(`🔌 Socket.io initialized with CORS for:`, allowedOrigins);
   
   // Start cron jobs
   try {
@@ -46,14 +75,17 @@ server.listen(PORT, () => {
   }
 });
 
-// Notification scheduler
-const notificationScheduler = require('./services/notificationScheduler');
-notificationScheduler.initializeSchedulers();
+// Notification scheduler (optional)
+try {
+  const notificationScheduler = require('./services/notificationScheduler');
+  notificationScheduler.initializeSchedulers();
+} catch (e) {
+  console.warn('⚠️  Notification scheduler not available:', e.message);
+}
 
 // Graceful shutdown
 process.on('SIGTERM', () => {
   console.log('SIGTERM signal received: closing HTTP server');
-  notificationScheduler.stopAll();
   server.close(() => {
     console.log('HTTP server closed');
   });

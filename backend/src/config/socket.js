@@ -1,131 +1,61 @@
-// backend/src/config/socket.js
-const socketIO = require('socket.io');
-const jwt = require('jsonwebtoken');
+// ============================================
+// FILE 6: frontend/src/services/socket.js - FIX
+// ============================================
+import { io } from 'socket.io-client';
 
-let io;
+const SOCKET_URL = process.env.REACT_APP_SOCKET_URL || 
+                   'https://freelancer-collaboration-portal.onrender.com';
 
-const initializeSocket = (server) => {
-  io = socketIO(server, {
-    cors: {
-      origin: process.env.CLIENT_URL || 'http://localhost:3000',
-      methods: ['GET', 'POST'],
-      credentials: true,
-    },
-  });
+let socket = null;
 
-  // Authentication middleware
-  io.use(async (socket, next) => {
-    try {
-      const token = socket.handshake.auth.token;
-      if (!token) {
-        return next(new Error('Authentication error'));
-      }
-
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      socket.userId = decoded.id;
-      next();
-    } catch (error) {
-      next(new Error('Authentication error'));
-    }
-  });
-
-  io.on('connection', (socket) => {
-    console.log(`User connected: ${socket.userId}`);
-
-    // Join user to their personal room
-    socket.join(`user_${socket.userId}`);
-
-    // Join project room
-socket.on('join_project', (projectId) => {
-  socket.join(`project_${projectId}`);
-});
-
-socket.on('send_message', async (data) => {
-  const { projectId, message, type } = data;
-  
-  // Broadcast to project room
-  io.to(`project_${projectId}`).emit('receive_message', {
-    userId: socket.userId,
-    message,
-    type,
-    timestamp: new Date(),
-  });
-});
-
-socket.on('typing', (data) => {
-  socket.to(`project_${data.projectId}`).emit('user_typing', {
-    userId: socket.userId,
-    projectId: data.projectId,
-  });
-});
-
-    // Leave project room
-    socket.on('leave_project', (projectId) => {
-      socket.leave(`project_${projectId}`);
-      console.log(`User ${socket.userId} left project ${projectId}`);
-    });
-
-    // Send message
-    socket.on('send_message', async (data) => {
-      const { projectId, message, type } = data;
-      
-      // Broadcast to project room
-      io.to(`project_${projectId}`).emit('receive_message', {
-        userId: socket.userId,
-        message,
-        type,
-        timestamp: new Date(),
-      });
-    });
-
-    // Typing indicator
-    socket.on('typing', (data) => {
-      socket.to(`project_${data.projectId}`).emit('user_typing', {
-        userId: socket.userId,
-        projectId: data.projectId,
-      });
-    });
-
-    // Stop typing
-    socket.on('stop_typing', (data) => {
-      socket.to(`project_${data.projectId}`).emit('user_stop_typing', {
-        userId: socket.userId,
-        projectId: data.projectId,
-      });
-    });
-
-    // Real-time task updates
-    socket.on('task_updated', (data) => {
-      socket.to(`project_${data.projectId}`).emit('task_update', data);
-    });
-
-    // Disconnect
-    socket.on('disconnect', () => {
-      console.log(`User disconnected: ${socket.userId}`);
-    });
-  });
-
-  return io;
-};
-
-const getIO = () => {
-  if (!io) {
-    throw new Error('Socket.io not initialized');
+export const initializeSocket = (token) => {
+  if (!token) {
+    console.error('❌ Cannot initialize socket without token');
+    return null;
   }
-  return io;
+
+  if (socket?.connected) {
+    console.log('✅ Socket already connected');
+    return socket;
+  }
+
+  console.log('🔌 Connecting to socket:', SOCKET_URL);
+
+  socket = io(SOCKET_URL, {
+    auth: { token },
+    transports: ['websocket', 'polling'], // Try websocket first, fallback to polling
+    reconnection: true,
+    reconnectionDelay: 1000,
+    reconnectionDelayMax: 5000,
+    reconnectionAttempts: 5,
+    timeout: 20000,
+  });
+
+  socket.on('connect', () => {
+    console.log('✅ Socket connected:', socket.id);
+  });
+
+  socket.on('connect_error', (error) => {
+    console.error('❌ Socket connection error:', error.message);
+  });
+
+  socket.on('disconnect', (reason) => {
+    console.log('🔌 Socket disconnected:', reason);
+  });
+
+  socket.on('error', (error) => {
+    console.error('❌ Socket error:', error);
+  });
+
+  return socket;
 };
 
-// Helper functions for emitting events
-const emitToUser = (userId, event, data) => {
-  if (io) {
-    io.to(`user_${userId}`).emit(event, data);
+export const disconnectSocket = () => {
+  if (socket) {
+    console.log('🔌 Disconnecting socket');
+    socket.disconnect();
+    socket = null;
   }
 };
 
-const emitToProject = (projectId, event, data) => {
-  if (io) {
-    io.to(`project_${projectId}`).emit(event, data);
-  }
-};
-
-module.exports = { initializeSocket, getIO, emitToUser, emitToProject };
+export const getSocket = () => socket;
