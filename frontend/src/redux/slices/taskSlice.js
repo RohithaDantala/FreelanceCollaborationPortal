@@ -21,11 +21,17 @@ export const createTask = createAsyncThunk(
   'tasks/create',
   async ({ projectId, taskData }, thunkAPI) => {
     try {
-      const response = await api.post(`/projects/${projectId}/tasks`, taskData);
+      const response = await api.post(
+        `/projects/${projectId}/tasks`, 
+        taskData,
+        { timeout: 10000 } // 10 second timeout
+      );
       return response.data.data.task;
     } catch (error) {
-      const message =
-        error.response?.data?.message || error.message || 'Failed to create task';
+      // Proper error handling
+      const message = error.response?.data?.message 
+        || error.message 
+        || 'Failed to create task';
       return thunkAPI.rejectWithValue(message);
     }
   }

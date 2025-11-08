@@ -195,39 +195,41 @@ const ProjectDetail = () => {
 
                 {/* Action Buttons */}
                 <div className="flex gap-2 flex-wrap">
-                  {/* Tasks button for all members */}
+                  {/* Member links */}
                   {isMember && (
-                    <Link
-                      to={`/projects/${project._id}/tasks`}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
-                    >
-                      <span>📋</span>
-                      <span>Tasks</span>
-                    </Link>
+                    <>
+                      <Link
+                        to={`/projects/${project._id}/tasks`}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
+                      >
+                        <span>📋</span>
+                        <span>Tasks</span>
+                      </Link>
+                      <Link
+                        to={`/projects/${project._id}/milestones`}
+                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2"
+                      >
+                        <span>🎯</span>
+                        <span>Milestones</span>
+                      </Link>
+                      <Link
+                        to={`/projects/${project._id}/files`}
+                        className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 flex items-center gap-2"
+                      >
+                        <span>📁</span>
+                        <span>Files</span>
+                      </Link>
+                      <Link
+                        to={`/projects/${project._id}/payments`}
+                        className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center gap-2"
+                      >
+                        <span>💳</span>
+                        <span>Payments</span>
+                      </Link>
+                    </>
                   )}
 
-                  {/* Milestones button for all members */}
-                  {isMember && (
-                    <Link
-                      to={`/projects/${project._id}/milestones`}
-                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2"
-                    >
-                      <span>🎯</span>
-                      <span>Milestones</span>
-                    </Link>
-                  )}
-
-                  {/* Files button for all members */}
-                  {isMember && (
-                    <Link
-                      to={`/projects/${project._id}/files`}
-                      className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 flex items-center gap-2"
-                    >
-                      <span>📁</span>
-                      <span>Files</span>
-                    </Link>
-                  )}
-                  
+                  {/* Owner controls */}
                   {isOwner && (
                     <>
                       <Link
@@ -471,110 +473,49 @@ const ProjectDetail = () => {
                               onClick={() => handleAcceptReject(applicant.user._id, 'rejected')}
                               className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm"
                             >
-                              ✗ Reject
+                              Reject
                             </button>
                           </div>
                         </div>
-                      ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Sidebar */}
-            <div className="space-y-6">
-              {/* Quick Actions */}
-              {isMember && (
-                <div className="bg-white rounded-lg shadow-md p-6">
-                  <h2 className="text-lg font-semibold text-gray-800 mb-4">Quick Actions</h2>
-                  <div className="space-y-2">
-                    <Link
-                      to={`/projects/${project._id}/tasks`}
-                      className="block w-full px-4 py-3 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 text-center font-medium transition-colors"
-                    >
-                      📋 Manage Tasks
-                    </Link>
-                    <Link
-                      to={`/projects/${project._id}/files`}
-                      className="block w-full px-4 py-3 bg-purple-50 text-purple-700 rounded-lg hover:bg-purple-100 text-center font-medium transition-colors"
-                    >
-                      📁 View Files
-                    </Link>
-                     <Link
-                        to={`/projects/${project._id}/reports`}
-                        className="block w-full px-4 py-3 bg-yellow-50 text-yellow-700 rounded-lg hover:bg-yellow-100 text-center font-medium transition-colors"
-                      >
-                        📊 View Reports
-                      </Link>
-                    {isOwner && (
-                      <Link
-                        to={`/projects/${project._id}/edit`}
-                        className="block w-full px-4 py-3 bg-primary-50 text-primary-700 rounded-lg hover:bg-primary-100 text-center font-medium transition-colors"
-                      >
-                        ✏️ Edit Project
-                      </Link>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Project Info */}
-              <div className="bg-white rounded-lg shadow-md p-6">
-                <h2 className="text-lg font-semibold text-gray-800 mb-4">Project Details</h2>
-                <div className="space-y-3">
-                  {project.budget && (project.budget.min > 0 || project.budget.max > 0) && (
-                    <div>
-                      <p className="text-sm text-gray-500">Budget</p>
-                      <p className="font-medium text-gray-800">
-                        ${project.budget.min} - ${project.budget.max} {project.budget.currency}
-                      </p>
-                    </div>
-                  )}
-                  {project.timeline?.estimatedDuration && (
-                    <div>
-                      <p className="text-sm text-gray-500">Duration</p>
-                      <p className="font-medium text-gray-800">
-                        {project.timeline.estimatedDuration}
-                      </p>
-                    </div>
-                  )}
-                  <div>
-                    <p className="text-sm text-gray-500">Created</p>
-                    <p className="font-medium text-gray-800">
-                      {new Date(project.createdAt).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-500">Last Updated</p>
-                    <p className="font-medium text-gray-800">
-                      {new Date(project.updatedAt).toLocaleDateString()}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Tags */}
-              {project.tags && project.tags.length > 0 && (
-                <div className="bg-white rounded-lg shadow-md p-6">
-                  <h2 className="text-lg font-semibold text-gray-800 mb-4">Tags</h2>
-                  <div className="flex flex-wrap gap-2">
-                    {project.tags.map((tag, index) => (
-                      <span
-                        key={index}
-                        className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm"
-                      >
-                        {tag}
-                      </span>
+                      </div>
                     ))}
                   </div>
                 </div>
               )}
-            </div>
-          </div>
-        </div>
-      </div>
 
-      {/* Application Modal */}
+            {/* Project Info */}
+            <div className="bg-white rounded-lg shadow-md p-6">
+              <h2 className="text-lg font-semibold text-gray-800 mb-4">Project Details</h2>
+              <div className="space-y-3">
+                {project.budget && (project.budget.min > 0 || project.budget.max > 0) && (
+                  <div>
+                    <p className="text-sm text-gray-500">Budget</p>
+                    <p className="font-medium text-gray-800">
+                      ${project.budget.min} - ${project.budget.max} {project.budget.currency}
+                    </p>
+                  </div>
+                )}
+                {project.timeline?.estimatedDuration && (
+                  <div>
+                    <p className="text-sm text-gray-500">Duration</p>
+                    <p className="font-medium text-gray-800">
+                      {project.timeline.estimatedDuration}
+                    </p>
+                  </div>
+                )}
+                <div>
+                  <p className="text-sm text-gray-500">Created</p>
+                  <p className="font-medium text-gray-800">
+                    {new Date(project.createdAt).toLocaleDateString()}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Last Updated</p>
+                  <p className="font-medium text-gray-800">
+                    {new Date(project.updatedAt).toLocaleDateString()}
+                  </p>
+                </div>
+              </div>
       {showApplicationModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">

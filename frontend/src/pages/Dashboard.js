@@ -1,8 +1,8 @@
 import React, { useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate, Link } from 'react-router-dom';
-import { logout } from '../redux/slices/authSlice';
 import { getMyProjects } from '../redux/slices/projectSlice';
+import DailyProgressChart from '../components/DailyProgressChart';
 
 const Dashboard = () => {
   const dispatch = useDispatch();
@@ -13,11 +13,6 @@ const Dashboard = () => {
   useEffect(() => {
     dispatch(getMyProjects());
   }, [dispatch]);
-
-  const handleLogout = () => {
-    dispatch(logout());
-    navigate('/login');
-  };
 
   if (!user) {
     return null;
@@ -105,54 +100,9 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Quick Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-          {canCreateProject ? (
-            <Link
-              to="/projects/create"
-              className="bg-gradient-to-br from-primary-500 to-primary-700 rounded-lg p-6 text-white hover:from-primary-600 hover:to-primary-800 transition-all shadow-md hover:shadow-xl transform hover:-translate-y-1"
-            >
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-white bg-opacity-20 rounded-lg flex items-center justify-center">
-                  <span className="text-3xl">✨</span>
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold mb-1">Create New Project</h3>
-                  <p className="text-primary-100">Start a new project and invite collaborators</p>
-                </div>
-              </div>
-            </Link>
-          ) : (
-            <Link
-              to="/projects"
-              className="bg-gradient-to-br from-primary-500 to-primary-700 rounded-lg p-6 text-white hover:from-primary-600 hover:to-primary-800 transition-all shadow-md hover:shadow-xl transform hover:-translate-y-1"
-            >
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-white bg-opacity-20 rounded-lg flex items-center justify-center">
-                  <span className="text-3xl">🔍</span>
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold mb-1">Find Projects</h3>
-                  <p className="text-primary-100">Browse available projects and apply to join</p>
-                </div>
-              </div>
-            </Link>
-          )}
-
-          <Link
-            to="/my-projects"
-            className="bg-gradient-to-br from-purple-500 to-purple-700 rounded-lg p-6 text-white hover:from-purple-600 hover:to-purple-800 transition-all shadow-md hover:shadow-xl transform hover:-translate-y-1"
-          >
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-white bg-opacity-20 rounded-lg flex items-center justify-center">
-                <span className="text-3xl">📂</span>
-              </div>
-              <div>
-                <h3 className="text-xl font-bold mb-1">My Projects</h3>
-                <p className="text-purple-100">View and manage all your projects</p>
-              </div>
-            </div>
-          </Link>
+        {/* Daily Progress */}
+        <div className="mb-6">
+          <DailyProgressChart days={14} />
         </div>
 
         {/* Role-specific Information */}

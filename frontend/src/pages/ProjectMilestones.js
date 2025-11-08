@@ -79,32 +79,31 @@ const ProjectMilestones = () => {
               <p className="text-gray-600">Track milestones and project progress</p>
             </div>
             <div className="flex gap-2">
-            {isMember && (
+              {isMember && (
                 <>
-                <Link
+                  <Link
                     to={`/projects/${id}/tasks`}
                     className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
-                >
+                  >
                     <span>📋</span>
                     <span>Tasks</span>
-                </Link>
-                <Link
+                  </Link>
+                  <Link
                     to={`/projects/${id}/milestones`}
                     className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2"
-                >
+                  >
                     <span>🎯</span>
                     <span>Milestones</span>
-                </Link>
+                  </Link>
                 </>
-            )}
-            <Link
+              )}
+              <Link
                 to={`/projects/${id}`}
                 className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
-            >
+              >
                 Back to Project
-            </Link>
+              </Link>
             </div>
-
           </div>
         </div>
 
@@ -137,8 +136,13 @@ const ProjectMilestones = () => {
         </div>
 
         {/* Content */}
-        <div className="bg-white rounded-lg shadow-md p-6">
-          {activeTab === 'progress' && <ProgressDashboard projectId={id} />}
+        <div className="bg-white rounded-lg shadow-md p-6 space-y-6">
+          {activeTab === 'progress' && (
+            <>
+              <ProgressDashboard projectId={id} />
+              <DailyProgressChart days={14} />
+            </>
+          )}
           {activeTab === 'milestones' && <MilestoneTimeline projectId={id} />}
         </div>
       </div>

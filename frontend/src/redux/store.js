@@ -5,6 +5,8 @@ import taskReducer from './slices/taskSlice';
 import fileReducer from './slices/fileSlice';
 import notificationReducer from './slices/notificationSlice';
 import milestoneReducer from './slices/milestoneSlice';
+import timeReducer from './slices/timeSlice';
+
 const store = configureStore({
   reducer: {
     auth: authReducer,
@@ -13,6 +15,7 @@ const store = configureStore({
     files: fileReducer,
     notifications: notificationReducer,
     milestones: milestoneReducer,
+    time: timeReducer,
 
   },
   middleware: (getDefaultMiddleware) =>
