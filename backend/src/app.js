@@ -2,6 +2,8 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const { errorHandler, notFound } = require('./middleware/errorHandler');
+const timeTrackingRoutes = require('./routes/timeTrackingRoutes');
+
 
 const app = express();
 
@@ -53,6 +55,8 @@ try {
   app.use('/api', require('./routes/messageRoutes')); // Message routes
   app.use('/api/payments', require('./routes/paymentRoutes')); // Payment routes
   app.use('/api', require('./routes/timeRoutes')); // Time tracking routes
+app.use('/api/time-tracking', timeTrackingRoutes);
+  
 } catch (error) {
   console.warn('⚠️ Some routes not found — create them under src/routes/');
 }

@@ -30,7 +30,19 @@ server.listen(PORT, () => {
     console.warn('Failed to start deadline reminder jobs:', e.message);
   }
 });
+const notificationScheduler = require('./services/notificationScheduler');
 
+// Start notification schedulers
+notificationScheduler.initializeSchedulers();
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('SIGTERM signal received: closing HTTP server');
+  notificationScheduler.stopAll();
+  server.close(() => {
+    console.log('HTTP server closed');
+  });
+});
 // Handle unhandled promise rejections
 process.on('unhandledRejection', err => {
   console.error('UN HANDLED REJECTION! Shutting down...');

@@ -36,10 +36,28 @@ const initializeSocket = (server) => {
     socket.join(`user_${socket.userId}`);
 
     // Join project room
-    socket.on('join_project', (projectId) => {
-      socket.join(`project_${projectId}`);
-      console.log(`User ${socket.userId} joined project ${projectId}`);
-    });
+socket.on('join_project', (projectId) => {
+  socket.join(`project_${projectId}`);
+});
+
+socket.on('send_message', async (data) => {
+  const { projectId, message, type } = data;
+  
+  // Broadcast to project room
+  io.to(`project_${projectId}`).emit('receive_message', {
+    userId: socket.userId,
+    message,
+    type,
+    timestamp: new Date(),
+  });
+});
+
+socket.on('typing', (data) => {
+  socket.to(`project_${data.projectId}`).emit('user_typing', {
+    userId: socket.userId,
+    projectId: data.projectId,
+  });
+});
 
     // Leave project room
     socket.on('leave_project', (projectId) => {

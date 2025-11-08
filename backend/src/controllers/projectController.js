@@ -1,526 +1,232 @@
+// backend/src/controllers/projectController.js - ENHANCED METHODS
 const Project = require('../models/Project');
-const Notification = require('../models/Notification');
-const { AppError } = require('../middleware/errorHandler');
-const { sendEmail, emailTemplates } = require('../config/email');
-// @desc    Create new project
-// @route   POST /api/projects
-// @access  Private
-exports.createProject = async (req, res, next) => {
+const emailService = require('../services/emailService');
+
+// Apply to project - ENHANCED with email notification
+exports.applyToProject = async (req, res) => {
   try {
-    const {
-      title,
-      description,
-      category,
-      skillsRequired,
-      budget,
-      timeline,
-      milestones,
-      tags,
-      isPublic,
-      maxMembers,
-    } = req.body;
+    const { projectId } = req.params;
+    const { coverLetter, proposedBudget } = req.body;
 
-    const project = await Project.create({
-      title,
-      description,
-      category,
-      owner: req.user.id,
-      skillsRequired,
-      budget,
-      timeline,
-      milestones,
-      tags,
-      isPublic,
-      maxMembers,
-      status: 'open',
-    });
-
-    // Populate owner details
-    await project.populate('owner', 'firstName lastName email avatar');
-
-    // ✅ NEW: SEND EMAILS TO MATCHING FREELANCERS
-    if (isPublic && skillsRequired && skillsRequired.length > 0) {
-      try {
-        const User = require('../models/User');
-        
-        // Find freelancers with matching skills
-        const matchingFreelancers = await User.find({
-          role: 'freelancer',
-          isActive: true,
-          skills: { $in: skillsRequired },
-        }).select('firstName lastName email skills');
-
-        // Send email to each matching freelancer
-        const emailPromises = matchingFreelancers.map(async (freelancer) => {
-          try {
-            const emailTemplate = emailTemplates.projectCreated({
-              freelancerName: freelancer.firstName,
-              projectTitle: project.title,
-              clientName: `${req.user.firstName} ${req.user.lastName}`,
-              skills: skillsRequired,
-              projectId: project._id,
-            });
-            
-            await sendEmail(freelancer.email, emailTemplate);
-          } catch (err) {
-            console.error(`Failed to send email to ${freelancer.email}:`, err);
-          }
-        });
-
-        await Promise.all(emailPromises);
-        console.log(`✅ Sent ${matchingFreelancers.length} project match emails`);
-      } catch (error) {
-        console.error('Failed to send project match emails:', error);
-      }
-    }
-
-    res.status(201).json({
-      success: true,
-      message: 'Project created successfully',
-      data: { project },
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-// @desc    Get all projects (with filters)
-// @route   GET /api/projects
-// @access  Public
-exports.getAllProjects = async (req, res, next) => {
-  try {
-    const {
-      status,
-      category,
-      skills,
-      search,
-      page = 1,
-      limit = 12,
-      sort = '-createdAt',
-    } = req.query;
-
-    const query = { isPublic: true };
-
-    // Filter by status
-    if (status) {
-      query.status = status;
-    }
-
-    // Filter by category
-    if (category) {
-      query.category = category;
-    }
-
-    // Filter by skills
-    if (skills) {
-      const skillsArray = skills.split(',');
-      query.skillsRequired = { $in: skillsArray };
-    }
-
-    // Search by title or description
-    if (search) {
-      query.$text = { $search: search };
-    }
-
-    const projects = await Project.find(query)
-      .populate('owner', 'firstName lastName email avatar')
-      .populate('members.user', 'firstName lastName avatar')
-      .limit(limit * 1)
-      .skip((page - 1) * limit)
-      .sort(sort);
-
-    const count = await Project.countDocuments(query);
-
-    res.status(200).json({
-      success: true,
-      data: {
-        projects,
-        totalPages: Math.ceil(count / limit),
-        currentPage: parseInt(page),
-        totalProjects: count,
-      },
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-// @desc    Get single project
-// @route   GET /api/projects/:id
-// @access  Public
-exports.getProject = async (req, res, next) => {
-  try {
-    const project = await Project.findById(req.params.id)
-      .populate('owner', 'firstName lastName email avatar bio')
-      .populate('members.user', 'firstName lastName avatar skills')
-      .populate('applicants.user', 'firstName lastName avatar skills');
+    const project = await Project.findById(projectId)
+      .populate('owner', 'name email');
 
     if (!project) {
-      return next(new AppError('Project not found', 404));
+      return res.status(404).json({ message: 'Project not found' });
     }
 
-    res.status(200).json({
-      success: true,
-      data: { project },
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-// @desc    Get user's projects
-// @route   GET /api/projects/my-projects
-// @access  Private
-exports.getMyProjects = async (req, res, next) => {
-  try {
-    const { status, role } = req.query;
-
-    const query = {
-      $or: [
-        { owner: req.user.id },
-        { 'members.user': req.user.id },
-      ],
-    };
-
-    if (status) {
-      query.status = status;
-    }
-
-    const projects = await Project.find(query)
-      .populate('owner', 'firstName lastName avatar')
-      .populate('members.user', 'firstName lastName avatar')
-      .sort('-updatedAt');
-
-    res.status(200).json({
-      success: true,
-      data: { projects },
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-// @desc    Update project
-// @route   PUT /api/projects/:id
-// @access  Private (Owner only)
-exports.updateProject = async (req, res, next) => {
-  try {
-    let project = await Project.findById(req.params.id);
-
-    if (!project) {
-      return next(new AppError('Project not found', 404));
-    }
-
-    // Check if user is owner
-    if (project.owner.toString() !== req.user.id) {
-      return next(
-        new AppError('Not authorized to update this project', 403)
-      );
-    }
-
-    const {
-      title,
-      description,
-      category,
-      skillsRequired,
-      budget,
-      timeline,
-      milestones,
-      tags,
-      status,
-      isPublic,
-      maxMembers,
-    } = req.body;
-
-    project = await Project.findByIdAndUpdate(
-      req.params.id,
-      {
-        title,
-        description,
-        category,
-        skillsRequired,
-        budget,
-        timeline,
-        milestones,
-        tags,
-        status,
-        isPublic,
-        maxMembers,
-      },
-      { new: true, runValidators: true }
-    ).populate('owner', 'firstName lastName avatar');
-
-    res.status(200).json({
-      success: true,
-      message: 'Project updated successfully',
-      data: { project },
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-// @desc    Delete project
-// @route   DELETE /api/projects/:id
-// @access  Private (Owner only)
-exports.deleteProject = async (req, res, next) => {
-  try {
-    const project = await Project.findById(req.params.id);
-
-    if (!project) {
-      return next(new AppError('Project not found', 404));
-    }
-
-    // Check if user is owner
-    if (project.owner.toString() !== req.user.id) {
-      return next(
-        new AppError('Not authorized to delete this project', 403)
-      );
-    }
-
-    await project.deleteOne();
-
-    res.status(200).json({
-      success: true,
-      message: 'Project deleted successfully',
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-// @desc    Apply to join project
-// @route   POST /api/projects/:id/apply
-// @access  Private
-exports.applyToProject = async (req, res, next) => {
-  try {
-    const project = await Project.findById(req.params.id).populate('owner', 'firstName lastName email');
-
-    if (!project) {
-      return next(new AppError('Project not found', 404));
-    }
-
-    // Check if already a member
-    if (project.members.some(m => m.user.toString() === req.user.id)) {
-      return next(new AppError('You are already a member of this project', 400));
+    if (project.owner._id.toString() === req.user.id) {
+      return res.status(400).json({ message: 'You cannot apply to your own project' });
     }
 
     // Check if already applied
-    if (project.applicants.some(a => a.user.toString() === req.user.id)) {
-      return next(new AppError('You have already applied to this project', 400));
+    const alreadyApplied = project.team.some(
+      member => member.user.toString() === req.user.id
+    );
+
+    if (alreadyApplied) {
+      return res.status(400).json({ message: 'You have already applied to this project' });
     }
 
-    // Check if project is full
-    if (project.members.length >= project.maxMembers) {
-      return next(new AppError('This project is full', 400));
-    }
-
-    const { message } = req.body;
-
-    project.applicants.push({
+    // Add application
+    project.team.push({
       user: req.user.id,
-      message,
-      appliedAt: Date.now(),
+      role: 'freelancer',
       status: 'pending',
+      coverLetter,
+      proposedBudget,
+      appliedAt: new Date()
     });
 
     await project.save();
 
-    // CREATE NOTIFICATION FOR PROJECT OWNER
-    await Notification.createNotification({
-      recipient: project.owner._id,
-      sender: req.user.id,
-      type: 'project_application',
-      title: 'New Project Application',
-      message: `${req.user.firstName} ${req.user.lastName} has applied to join "${project.title}"`,
-      link: `/projects/${project._id}`,
-      project: project._id,
-    });
-
-    // ✅ NEW: SEND EMAIL TO PROJECT OWNER
-    try {
-      const emailTemplate = emailTemplates.applicationReceived({
-        applicantName: `${req.user.firstName} ${req.user.lastName}`,
-        projectTitle: project.title,
-        clientName: project.owner.firstName,
-        projectId: project._id,
-      });
-      
-      await sendEmail(project.owner.email, emailTemplate);
-    } catch (emailError) {
-      console.error('Failed to send application email:', emailError);
-      // Don't fail the request if email fails
-    }
+    // Send email notification to project owner
+    await emailService.sendApplicationNotification(
+      project.owner.email,
+      req.user.name,
+      project.title,
+      project._id
+    );
 
     res.status(200).json({
-      success: true,
       message: 'Application submitted successfully',
+      project
     });
   } catch (error) {
-    next(error);
+    console.error('Apply to project error:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
-// @desc    Accept/Reject application
-// @route   PUT /api/projects/:id/applicants/:applicantId
-// @access  Private (Owner only)
-exports.handleApplication = async (req, res, next) => {
+
+// Approve freelancer application - ENHANCED with email
+exports.approveFreelancer = async (req, res) => {
   try {
-    const project = await Project.findById(req.params.id).populate('owner', 'firstName lastName email');
+    const { projectId, userId } = req.params;
+
+    const project = await Project.findById(projectId)
+      .populate('team.user', 'name email');
 
     if (!project) {
-      return next(new AppError('Project not found', 404));
+      return res.status(404).json({ message: 'Project not found' });
     }
 
-    // Check if user is owner
-    if (project.owner._id.toString() !== req.user.id) {
-      return next(new AppError('Not authorized', 403));
-    }
-
-    const { status } = req.body; // 'accepted' or 'rejected'
-    const applicantId = req.params.applicantId;
-
-    const applicant = project.applicants.find(
-      a => a.user.toString() === applicantId
-    );
-
-    if (!applicant) {
-      return next(new AppError('Applicant not found', 404));
-    }
-
-    // Update applicant status
-    applicant.status = status;
-
-    // Only add to members if accepted AND not already a member
-    const isMember = project.members.some(m => m.user.toString() === applicantId);
-    
-    if (status === 'accepted' && !isMember) {  
-      project.members.push({
-        user: applicantId,
-        role: 'member',
-        joinedAt: Date.now(),
-      });
-    }
-
-    await project.save();
-    
-    // Get applicant details for email
-    const User = require('../models/User');
-    const applicantUser = await User.findById(applicantId);
-    
-    // CREATE NOTIFICATION FOR APPLICANT
-    const notificationType = status === 'accepted' ? 'application_accepted' : 'application_rejected';
-    const notificationTitle = status === 'accepted' ? 'Application Accepted!' : 'Application Not Accepted';
-    const notificationMessage = status === 'accepted' 
-      ? `Your application to join "${project.title}" has been accepted!`
-      : `Your application to join "${project.title}" was not accepted at this time.`;
-
-    await Notification.createNotification({
-      recipient: applicantId,
-      sender: req.user.id,
-      type: notificationType,
-      title: notificationTitle,
-      message: notificationMessage,
-      link: `/projects/${project._id}`,
-      project: project._id,
-    });
-
-    // ✅ NEW: SEND EMAIL TO APPLICANT
-    try {
-      const emailTemplate = status === 'accepted'
-        ? emailTemplates.applicationApproved({
-            applicantName: applicantUser.firstName,
-            projectTitle: project.title,
-            clientName: project.owner.firstName,
-            projectId: project._id,
-          })
-        : emailTemplates.applicationRejected({
-            applicantName: applicantUser.firstName,
-            projectTitle: project.title,
-          });
-      
-      await sendEmail(applicantUser.email, emailTemplate);
-    } catch (emailError) {
-      console.error('Failed to send application status email:', emailError);
-    }
-
-    // Populate before sending response
-    await project.populate([
-      { path: 'owner', select: 'firstName lastName email avatar' },
-      { path: 'members.user', select: 'firstName lastName avatar' },
-      { path: 'applicants.user', select: 'firstName lastName avatar' }
-    ]);
-    
-    res.status(200).json({
-      success: true,
-      message: `Application ${status} successfully`,
-      data: { project },
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-// @desc    Remove member from project
-// @route   DELETE /api/projects/:id/members/:memberId
-// @access  Private (Owner only)
-exports.removeMember = async (req, res, next) => {
-  try {
-    const project = await Project.findById(req.params.id);
-
-    if (!project) {
-      return next(new AppError('Project not found', 404));
-    }
-
-    // Check if user is owner
+    // Verify requester is project owner
     if (project.owner.toString() !== req.user.id) {
-      return next(new AppError('Not authorized', 403));
+      return res.status(403).json({ message: 'Only project owner can approve applications' });
     }
 
-    const memberId = req.params.memberId;
-
-    // Cannot remove owner
-    if (memberId === project.owner.toString()) {
-      return next(new AppError('Cannot remove project owner', 400));
-    }
-
-    // Remove from members array
-    project.members = project.members.filter(
-      m => m.user.toString() !== memberId
+    // Find team member
+    const teamMember = project.team.find(
+      member => member.user._id.toString() === userId
     );
 
-    // CRITICAL FIX: Update applicant status to 'removed'
-    const applicantIndex = project.applicants.findIndex(
-      a => a.user.toString() === memberId
-    );
-    
-    if (applicantIndex !== -1) {
-      project.applicants[applicantIndex].status = 'removed';
+    if (!teamMember) {
+      return res.status(404).json({ message: 'Application not found' });
     }
+
+    if (teamMember.status === 'approved') {
+      return res.status(400).json({ message: 'Application already approved' });
+    }
+
+    // Approve the application
+    teamMember.status = 'approved';
+    teamMember.approvedAt = new Date();
+    await project.save();
+
+    // Send approval email to freelancer
+    await emailService.sendApplicationApproved(
+      teamMember.user.email,
+      project.title,
+      req.user.name,
+      project._id
+    );
+
+    res.json({
+      message: 'Freelancer approved successfully',
+      project
+    });
+  } catch (error) {
+    console.error('Approve freelancer error:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// Reject freelancer application - ENHANCED with email
+exports.rejectFreelancer = async (req, res) => {
+  try {
+    const { projectId, userId } = req.params;
+
+    const project = await Project.findById(projectId)
+      .populate('team.user', 'name email');
+
+    if (!project) {
+      return res.status(404).json({ message: 'Project not found' });
+    }
+
+    if (project.owner.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'Only project owner can reject applications' });
+    }
+
+    const teamMemberIndex = project.team.findIndex(
+      member => member.user._id.toString() === userId
+    );
+
+    if (teamMemberIndex === -1) {
+      return res.status(404).json({ message: 'Application not found' });
+    }
+
+    const teamMember = project.team[teamMemberIndex];
+
+    // Send rejection email
+    await emailService.sendApplicationRejected(
+      teamMember.user.email,
+      project.title,
+      req.user.name
+    );
+
+    // Remove from team
+    project.team.splice(teamMemberIndex, 1);
+    await project.save();
+
+    res.json({
+      message: 'Application rejected',
+      project
+    });
+  } catch (error) {
+    console.error('Reject freelancer error:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// Create project - ENHANCED with matching notification
+exports.createProject = async (req, res) => {
+  try {
+    const {
+      title,
+      description,
+      category,
+      budget,
+      deadline,
+      tags,
+      requirements
+    } = req.body;
+
+    const project = new Project({
+      title,
+      description,
+      category,
+      budget,
+      deadline,
+      tags: tags || [],
+      requirements,
+      owner: req.user.id,
+      status: 'open'
+    });
 
     await project.save();
 
-    // CREATE NOTIFICATION FOR REMOVED MEMBER
-    await Notification.createNotification({
-      recipient: memberId,
-      sender: req.user.id,
-      type: 'member_removed',
-      title: 'Removed from Project',
-      message: `You have been removed from the project "${project.title}"`,
-      link: `/projects`,
-      project: project._id,
-    });
+    // Find and notify matching freelancers (async, don't wait)
+    if (tags && tags.length > 0) {
+      const User = require('../models/User');
+      
+      User.find({
+        role: 'freelancer',
+        skills: { $in: tags },
+        emailNotifications: { $ne: false }
+      }).then(freelancers => {
+        if (freelancers.length > 0) {
+          const freelancersWithMatches = freelancers.map(freelancer => ({
+            email: freelancer.email,
+            name: freelancer.name,
+            matchingTags: tags.filter(tag => freelancer.skills.includes(tag))
+          }));
 
-    // Populate before sending response
-    await project.populate([
-      { path: 'owner', select: 'firstName lastName email avatar' },
-      { path: 'members.user', select: 'firstName lastName avatar' },
-      { path: 'applicants.user', select: 'firstName lastName avatar' }
-    ]);
+          emailService.sendBatchProjectMatches(project, freelancersWithMatches)
+            .then(() => {
+              console.log(`Sent match notifications for project: ${project.title}`);
+              // Mark notifications as sent
+              Project.findByIdAndUpdate(project._id, { 
+                matchNotificationsSent: true 
+              }).catch(err => console.error('Update error:', err));
+            })
+            .catch(err => console.error('Match notification error:', err));
+        }
+      }).catch(err => console.error('Find freelancers error:', err));
+    }
 
-    res.status(200).json({
-      success: true,
-      message: 'Member removed successfully',
-      data: { project },
+    res.status(201).json({
+      message: 'Project created successfully',
+      project
     });
   } catch (error) {
-    next(error);
+    console.error('Create project error:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
+
+// Add these routes to projectRoutes.js:
+/*
+router.post('/:projectId/apply', auth, projectController.applyToProject);
+router.put('/:projectId/approve/:userId', auth, projectController.approveFreelancer);
+router.delete('/:projectId/reject/:userId', auth, projectController.rejectFreelancer);
+*/
