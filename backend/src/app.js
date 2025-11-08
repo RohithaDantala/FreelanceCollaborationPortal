@@ -9,17 +9,19 @@ const app = express();
 app.use(helmet());
 
 // CORS configuration
-// CORS configuration
+
 const allowedOrigins = [
-  process.env.CLIENT_URL,
-  'http://localhost:3000', // for local testing
-];
+  (process.env.CLIENT_URL || '').trim(), // deployed frontend
+  'http://localhost:3000',               // local dev
+].filter(Boolean); // remove any empty strings
 
 const corsOptions = {
   origin: function (origin, callback) {
+    // allow requests with no origin (like Postman or server-to-server)
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
+      console.warn('Blocked by CORS:', origin);
       callback(new Error('Not allowed by CORS'));
     }
   },
@@ -28,6 +30,7 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
+
 
 
 // Body parser middleware
