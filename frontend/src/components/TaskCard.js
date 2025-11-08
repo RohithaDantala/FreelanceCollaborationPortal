@@ -6,8 +6,17 @@ const TaskCard = ({ task, onDragStart, onClick, getPriorityColor, canDrag = true
   const dispatch = useDispatch();
   const { user } = useSelector((state) => state.auth);
   const { currentProject } = useSelector((state) => state.projects);
-  const { groupedTasks } = useSelector((state) => state.tasks);
+  const { groupedTasks = {} } = useSelector((state) => state.tasks);
+  
   const isOwner = currentProject?.owner?._id === user.id;
+
+  // Safe defaults for groupedTasks
+  const safeGroupedTasks = {
+    todo: groupedTasks?.todo || [],
+    in_progress: groupedTasks?.in_progress || [],
+    review: groupedTasks?.review || [],
+    done: groupedTasks?.done || [],
+  };
 
   const canDragTask = isOwner && canDrag;
   const isAssignee = task.assignee?._id === user.id;
@@ -27,7 +36,12 @@ const TaskCard = ({ task, onDragStart, onClick, getPriorityColor, canDrag = true
     e.stopPropagation();
     
     // Optimistic update
-    const updatedGroupedTasks = { ...groupedTasks };
+    const updatedGroupedTasks = {
+      todo: [...safeGroupedTasks.todo],
+      in_progress: [...safeGroupedTasks.in_progress],
+      review: [...safeGroupedTasks.review],
+      done: [...safeGroupedTasks.done],
+    };
     
     // Remove from current column
     updatedGroupedTasks[task.status] = updatedGroupedTasks[task.status].filter(
@@ -55,7 +69,12 @@ const TaskCard = ({ task, onDragStart, onClick, getPriorityColor, canDrag = true
     e.stopPropagation();
     
     // Optimistic update
-    const updatedGroupedTasks = { ...groupedTasks };
+    const updatedGroupedTasks = {
+      todo: [...safeGroupedTasks.todo],
+      in_progress: [...safeGroupedTasks.in_progress],
+      review: [...safeGroupedTasks.review],
+      done: [...safeGroupedTasks.done],
+    };
     
     // Remove from current column
     updatedGroupedTasks[task.status] = updatedGroupedTasks[task.status].filter(

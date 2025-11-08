@@ -13,7 +13,7 @@ import CreateTaskModal from './CreateTaskModal';
 
 const KanbanBoard = ({ projectId }) => {
   const dispatch = useDispatch();
-  const { groupedTasks, isLoading } = useSelector((state) => state.tasks);
+  const { groupedTasks = {}, isLoading } = useSelector((state) => state.tasks);
   const { user } = useSelector((state) => state.auth);
   const { currentProject } = useSelector((state) => state.projects);
   
@@ -52,6 +52,14 @@ const KanbanBoard = ({ projectId }) => {
     },
   ];
 
+  // Initialize empty arrays for each column if not present
+  const safeGroupedTasks = {
+    todo: groupedTasks?.todo || [],
+    in_progress: groupedTasks?.in_progress || [],
+    review: groupedTasks?.review || [],
+    done: groupedTasks?.done || [],
+  };
+
   useEffect(() => {
     if (projectId) {
       dispatch(getProjectTasks(projectId));
@@ -74,52 +82,58 @@ const KanbanBoard = ({ projectId }) => {
     setDraggedOverColumn(null);
   };
 
-const handleDrop = async (e, newStatus) => {
-  e.preventDefault();
-  setDraggedOverColumn(null);
+  const handleDrop = async (e, newStatus) => {
+    e.preventDefault();
+    setDraggedOverColumn(null);
 
-  if (!draggedTask || draggedTask.status === newStatus) {
-    setDraggedTask(null);
-    return;
-  }
+    if (!draggedTask || draggedTask.status === newStatus) {
+      setDraggedTask(null);
+      return;
+    }
 
-  // Optimistic update - IMPROVED
-  const updatedGroupedTasks = { ...groupedTasks };
-  
-  // Remove from old column
-  updatedGroupedTasks[draggedTask.status] = updatedGroupedTasks[
-    draggedTask.status
-  ].filter((t) => t._id !== draggedTask._id);
-
-  // Add to new column with updated status
-  const updatedTask = { ...draggedTask, status: newStatus };
-  updatedGroupedTasks[newStatus] = [
-    ...updatedGroupedTasks[newStatus],
-    updatedTask,
-  ];
-
-  // Update state immediately for instant UI feedback
-  dispatch(updateTasksOptimistically(updatedGroupedTasks));
-
-  // Update on server
-  try {
-    await dispatch(
-      updateTask({
-        id: draggedTask._id,
-        taskData: { status: newStatus },
-      })
-    ).unwrap();
+    // Optimistic update
+    const updatedGroupedTasks = {
+      todo: [...(safeGroupedTasks.todo || [])],
+      in_progress: [...(safeGroupedTasks.in_progress || [])],
+      review: [...(safeGroupedTasks.review || [])],
+      done: [...(safeGroupedTasks.done || [])],
+    };
     
-    // SUCCESS: Refresh to get correct order from server
-    await dispatch(getProjectTasks(projectId));
-  } catch (error) {
-    // ERROR: Revert optimistic update
-    console.error('Failed to update task:', error);
-    dispatch(getProjectTasks(projectId));
-  }
+    // Remove from old column
+    updatedGroupedTasks[draggedTask.status] = updatedGroupedTasks[
+      draggedTask.status
+    ].filter((t) => t._id !== draggedTask._id);
 
-  setDraggedTask(null);
-};
+    // Add to new column with updated status
+    const updatedTask = { ...draggedTask, status: newStatus };
+    updatedGroupedTasks[newStatus] = [
+      ...updatedGroupedTasks[newStatus],
+      updatedTask,
+    ];
+
+    // Update state immediately for instant UI feedback
+    dispatch(updateTasksOptimistically(updatedGroupedTasks));
+
+    // Update on server
+    try {
+      await dispatch(
+        updateTask({
+          id: draggedTask._id,
+          taskData: { status: newStatus },
+        })
+      ).unwrap();
+      
+      // SUCCESS: Refresh to get correct order from server
+      await dispatch(getProjectTasks(projectId));
+    } catch (error) {
+      // ERROR: Revert optimistic update
+      console.error('Failed to update task:', error);
+      dispatch(getProjectTasks(projectId));
+    }
+
+    setDraggedTask(null);
+  };
+
   const handleTaskClick = (task) => {
     setSelectedTask(task);
     setShowTaskModal(true);
@@ -147,9 +161,9 @@ const handleDrop = async (e, newStatus) => {
     return colors[priority] || colors.medium;
   };
 
-  // Calculate task statistics
-  const totalTasks = Object.values(groupedTasks).reduce((acc, col) => acc + col.length, 0);
-  const completedTasks = groupedTasks.done?.length || 0;
+  // Calculate task statistics with safe defaults
+  const totalTasks = Object.values(safeGroupedTasks).reduce((acc, col) => acc + (col?.length || 0), 0);
+  const completedTasks = safeGroupedTasks.done?.length || 0;
   const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
   if (isLoading) {
@@ -191,7 +205,7 @@ const handleDrop = async (e, newStatus) => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs text-gray-500 uppercase font-medium">In Progress</p>
-                <p className="text-2xl font-bold text-blue-600">{groupedTasks.in_progress?.length || 0}</p>
+                <p className="text-2xl font-bold text-blue-600">{safeGroupedTasks.in_progress?.length || 0}</p>
               </div>
               <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
                 <span className="text-xl">⚡</span>
@@ -203,7 +217,7 @@ const handleDrop = async (e, newStatus) => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs text-gray-500 uppercase font-medium">Review</p>
-                <p className="text-2xl font-bold text-yellow-600">{groupedTasks.review?.length || 0}</p>
+                <p className="text-2xl font-bold text-yellow-600">{safeGroupedTasks.review?.length || 0}</p>
               </div>
               <div className="w-10 h-10 bg-yellow-100 rounded-full flex items-center justify-center">
                 <span className="text-xl">👀</span>
@@ -254,7 +268,7 @@ const handleDrop = async (e, newStatus) => {
               <div className="flex items-center gap-2">
                 <h3 className="font-semibold text-gray-800 text-lg">{column.title}</h3>
                 <span className="px-2.5 py-0.5 bg-white text-gray-600 text-sm rounded-full font-medium shadow-sm">
-                  {groupedTasks[column.id]?.length || 0}
+                  {safeGroupedTasks[column.id]?.length || 0}
                 </span>
               </div>
               {/* Add Task Button - Only for Owner */}
@@ -285,7 +299,7 @@ const handleDrop = async (e, newStatus) => {
 
             {/* Task Cards */}
             <div className="flex-1 overflow-y-auto space-y-2 pr-1" style={{ scrollbarWidth: 'thin' }}>
-              {groupedTasks[column.id]?.map((task) => (
+              {safeGroupedTasks[column.id]?.map((task) => (
                 <TaskCard
                   key={task._id}
                   task={task}
@@ -296,7 +310,7 @@ const handleDrop = async (e, newStatus) => {
                 />
               ))}
 
-              {(!groupedTasks[column.id] || groupedTasks[column.id].length === 0) && (
+              {(!safeGroupedTasks[column.id] || safeGroupedTasks[column.id].length === 0) && (
                 <div className="text-center py-12">
                   <div className="text-4xl mb-3 opacity-50">
                     {column.id === 'todo' && '📝'}

@@ -1,16 +1,16 @@
-// backend/src/controllers/timeTrackingController.js
-const TimeEntry = require('../models/TimeTracking');
+// backend/src/controllers/timeTrackingController.js - FIXED
+const TimeEntry = require('../models/TimeTracking'); // Use TimeTracking model
 const Project = require('../models/Project');
 const mongoose = require('mongoose');
 
 // Start a new timer
 exports.startTimer = async (req, res) => {
   try {
-    const { projectId, taskId, description } = req.body;
+    const { projectId, taskId, description, workType } = req.body;
 
     // Check if there's already a running timer for this user
     const runningEntry = await TimeEntry.findOne({
-      userId: req.user.id,
+      user: req.user.id,
       endTime: null
     });
 
@@ -29,38 +29,41 @@ exports.startTimer = async (req, res) => {
       }
 
       // Check if user is part of the project
-      const isMember = project.team.some(
-        member => member.userId.toString() === req.user.id
+      const isMember = project.members.some(
+        member => member.user.toString() === req.user.id
       );
       
-      if (!isMember && project.clientId.toString() !== req.user.id) {
+      if (!isMember && project.owner.toString() !== req.user.id) {
         return res.status(403).json({ message: 'Access denied to this project' });
       }
     }
 
     // Create new time entry
     const timeEntry = new TimeEntry({
-      userId: req.user.id,
-      projectId,
-      taskId,
+      user: req.user.id,
+      project: projectId,
+      task: taskId,
       description,
+      workType: workType || 'development',
       startTime: new Date(),
-      endTime: null
+      endTime: null,
+      status: 'active'
     });
 
     await timeEntry.save();
 
     const populatedEntry = await TimeEntry.findById(timeEntry._id)
-      .populate('projectId', 'title')
-      .populate('userId', 'name email');
+      .populate('project', 'title')
+      .populate('user', 'firstName lastName email');
 
     res.status(201).json({
+      success: true,
       message: 'Timer started successfully',
       timeEntry: populatedEntry
     });
   } catch (error) {
     console.error('Start timer error:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
   }
 };
 
@@ -74,40 +77,40 @@ exports.stopTimer = async (req, res) => {
       // Stop specific entry by ID
       timeEntry = await TimeEntry.findOne({
         _id: entryId,
-        userId: req.user.id,
+        user: req.user.id,
         endTime: null
       });
     } else {
       // Stop the currently running timer
       timeEntry = await TimeEntry.findOne({
-        userId: req.user.id,
+        user: req.user.id,
         endTime: null
       });
     }
 
     if (!timeEntry) {
-      return res.status(404).json({ message: 'No running timer found' });
+      return res.status(404).json({ success: false, message: 'No running timer found' });
     }
 
     timeEntry.endTime = new Date();
+    timeEntry.status = 'completed';
     
-    // Calculate duration in milliseconds
-    const duration = timeEntry.endTime - timeEntry.startTime;
-    timeEntry.duration = Math.floor(duration / 1000); // Store in seconds
-
+    // Duration is calculated in the pre-save hook
     await timeEntry.save();
 
     const populatedEntry = await TimeEntry.findById(timeEntry._id)
-      .populate('projectId', 'title')
-      .populate('userId', 'name email');
+      .populate('project', 'title')
+      .populate('user', 'firstName lastName email');
 
     res.json({
+      success: true,
       message: 'Timer stopped successfully',
-      timeEntry: populatedEntry
+      timeEntry: populatedEntry,
+      duration: timeEntry.duration
     });
   } catch (error) {
     console.error('Stop timer error:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
   }
 };
 
@@ -115,33 +118,39 @@ exports.stopTimer = async (req, res) => {
 exports.getRunning = async (req, res) => {
   try {
     const runningEntry = await TimeEntry.findOne({
-      userId: req.user.id,
+      user: req.user.id,
       endTime: null
     })
-      .populate('projectId', 'title')
-      .populate('userId', 'name email');
+      .populate('project', 'title')
+      .populate('user', 'firstName lastName email');
 
     if (!runningEntry) {
-      return res.json({ running: false, timeEntry: null });
+      return res.json({ 
+        success: true,
+        running: false, 
+        timeEntry: null 
+      });
     }
 
     res.json({
+      success: true,
       running: true,
       timeEntry: runningEntry
     });
   } catch (error) {
     console.error('Get running timer error:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
   }
 };
 
 // Create a manual time entry
 exports.createEntry = async (req, res) => {
   try {
-    const { projectId, taskId, description, startTime, endTime, duration } = req.body;
+    const { projectId, taskId, description, startTime, endTime, workType } = req.body;
 
     if (!startTime || !endTime) {
       return res.status(400).json({ 
+        success: false,
         message: 'Start time and end time are required for manual entries' 
       });
     }
@@ -150,15 +159,15 @@ exports.createEntry = async (req, res) => {
     if (projectId) {
       const project = await Project.findById(projectId);
       if (!project) {
-        return res.status(404).json({ message: 'Project not found' });
+        return res.status(404).json({ success: false, message: 'Project not found' });
       }
 
-      const isMember = project.team.some(
-        member => member.userId.toString() === req.user.id
+      const isMember = project.members.some(
+        member => member.user.toString() === req.user.id
       );
       
-      if (!isMember && project.clientId.toString() !== req.user.id) {
-        return res.status(403).json({ message: 'Access denied to this project' });
+      if (!isMember && project.owner.toString() !== req.user.id) {
+        return res.status(403).json({ success: false, message: 'Access denied to this project' });
       }
     }
 
@@ -166,34 +175,34 @@ exports.createEntry = async (req, res) => {
     const end = new Date(endTime);
     
     if (end <= start) {
-      return res.status(400).json({ message: 'End time must be after start time' });
+      return res.status(400).json({ success: false, message: 'End time must be after start time' });
     }
 
-    const calculatedDuration = Math.floor((end - start) / 1000); // in seconds
-
     const timeEntry = new TimeEntry({
-      userId: req.user.id,
-      projectId,
-      taskId,
+      user: req.user.id,
+      project: projectId,
+      task: taskId,
       description,
+      workType: workType || 'development',
       startTime: start,
       endTime: end,
-      duration: duration || calculatedDuration
+      status: 'completed'
     });
 
     await timeEntry.save();
 
     const populatedEntry = await TimeEntry.findById(timeEntry._id)
-      .populate('projectId', 'title')
-      .populate('userId', 'name email');
+      .populate('project', 'title')
+      .populate('user', 'firstName lastName email');
 
     res.status(201).json({
+      success: true,
       message: 'Time entry created successfully',
       timeEntry: populatedEntry
     });
   } catch (error) {
     console.error('Create entry error:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
   }
 };
 
@@ -202,10 +211,10 @@ exports.getMyEntries = async (req, res) => {
   try {
     const { projectId, startDate, endDate, page = 1, limit = 50 } = req.query;
 
-    const query = { userId: req.user.id };
+    const query = { user: req.user.id };
 
     if (projectId) {
-      query.projectId = projectId;
+      query.project = projectId;
     }
 
     if (startDate || endDate) {
@@ -222,8 +231,8 @@ exports.getMyEntries = async (req, res) => {
 
     const [entries, total] = await Promise.all([
       TimeEntry.find(query)
-        .populate('projectId', 'title')
-        .populate('userId', 'name email')
+        .populate('project', 'title')
+        .populate('user', 'firstName lastName email')
         .sort({ startTime: -1 })
         .skip(skip)
         .limit(parseInt(limit)),
@@ -231,6 +240,7 @@ exports.getMyEntries = async (req, res) => {
     ]);
 
     res.json({
+      success: true,
       entries,
       pagination: {
         total,
@@ -241,22 +251,22 @@ exports.getMyEntries = async (req, res) => {
     });
   } catch (error) {
     console.error('Get entries error:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
   }
 };
 
 // Get time tracking summary/statistics
 exports.getSummary = async (req, res) => {
   try {
-    const { projectId, startDate, endDate, groupBy = 'day' } = req.query;
+    const { projectId, startDate, endDate } = req.query;
 
     const matchQuery = { 
-      userId: req.user.id,
+      user: req.user.id,
       endTime: { $ne: null } // Only completed entries
     };
 
     if (projectId) {
-      matchQuery.projectId = projectId;
+      matchQuery.project = mongoose.Types.ObjectId(projectId);
     }
 
     if (startDate || endDate) {
@@ -275,7 +285,7 @@ exports.getSummary = async (req, res) => {
       {
         $group: {
           _id: null,
-          totalSeconds: { $sum: '$duration' },
+          totalMinutes: { $sum: '$duration' },
           totalEntries: { $sum: 1 }
         }
       }
@@ -286,8 +296,8 @@ exports.getSummary = async (req, res) => {
       { $match: matchQuery },
       {
         $group: {
-          _id: '$projectId',
-          totalSeconds: { $sum: '$duration' },
+          _id: '$project',
+          totalMinutes: { $sum: '$duration' },
           entries: { $sum: 1 }
         }
       },
@@ -304,16 +314,16 @@ exports.getSummary = async (req, res) => {
         $project: {
           projectId: '$_id',
           projectTitle: '$project.title',
-          totalSeconds: 1,
+          totalMinutes: 1,
           entries: 1,
-          hours: { $divide: ['$totalSeconds', 3600] }
+          hours: { $divide: ['$totalMinutes', 60] }
         }
       }
     ]);
 
     const summary = {
-      total: totalResult[0] || { totalSeconds: 0, totalEntries: 0 },
-      totalHours: totalResult[0] ? (totalResult[0].totalSeconds / 3600).toFixed(2) : 0,
+      total: totalResult[0] || { totalMinutes: 0, totalEntries: 0 },
+      totalHours: totalResult[0] ? (totalResult[0].totalMinutes / 60).toFixed(2) : 0,
       byProject,
       period: {
         startDate: startDate || 'all',
@@ -321,9 +331,9 @@ exports.getSummary = async (req, res) => {
       }
     };
 
-    res.json(summary);
+    res.json({ success: true, ...summary });
   } catch (error) {
     console.error('Get summary error:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
   }
 };

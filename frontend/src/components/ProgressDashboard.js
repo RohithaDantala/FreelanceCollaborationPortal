@@ -1,4 +1,4 @@
-// frontend/src/components/ProgressDashboard.js
+// frontend/src/components/ProgressDashboard.js - FIXED
 import React, { useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { getProjectProgress, reset } from '../redux/slices/milestoneSlice';
@@ -7,26 +7,34 @@ import { getProjectTasks } from '../redux/slices/taskSlice';
 const ProgressDashboard = ({ projectId }) => {
   const dispatch = useDispatch();
   const { progress, isLoading } = useSelector((state) => state.milestones);
-  const { groupedTasks } = useSelector((state) => state.tasks);
+  const { groupedTasks = {} } = useSelector((state) => state.tasks);
 
-useEffect(() => {
-  if (projectId) {
-    // Initial fetch
-    dispatch(getProjectProgress(projectId));
-    dispatch(getProjectTasks(projectId));
-    
-    // ADDED: Auto-refresh every 30 seconds
-    const interval = setInterval(() => {
+  // Safe defaults for groupedTasks
+  const safeGroupedTasks = {
+    todo: groupedTasks?.todo || [],
+    in_progress: groupedTasks?.in_progress || [],
+    review: groupedTasks?.review || [],
+    done: groupedTasks?.done || [],
+  };
+
+  useEffect(() => {
+    if (projectId) {
+      // Initial fetch
       dispatch(getProjectProgress(projectId));
       dispatch(getProjectTasks(projectId));
-    }, 30000);
-    
-    return () => {
-      clearInterval(interval);
-      dispatch(reset());
-    };
-  }
-}, [dispatch, projectId]);
+      
+      // Auto-refresh every 30 seconds
+      const interval = setInterval(() => {
+        dispatch(getProjectProgress(projectId));
+        dispatch(getProjectTasks(projectId));
+      }, 30000);
+      
+      return () => {
+        clearInterval(interval);
+        dispatch(reset());
+      };
+    }
+  }, [dispatch, projectId]);
 
   if (isLoading) {
     return (
@@ -37,15 +45,21 @@ useEffect(() => {
   }
 
   if (!progress) {
-    return null;
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="text-center text-gray-500">
+          <p>Loading progress data...</p>
+        </div>
+      </div>
+    );
   }
 
   const taskStats = {
-    total: Object.values(groupedTasks).reduce((sum, tasks) => sum + tasks.length, 0),
-    todo: groupedTasks.todo?.length || 0,
-    inProgress: groupedTasks.in_progress?.length || 0,
-    review: groupedTasks.review?.length || 0,
-    done: groupedTasks.done?.length || 0,
+    total: Object.values(safeGroupedTasks).reduce((sum, tasks) => sum + (tasks?.length || 0), 0),
+    todo: safeGroupedTasks.todo?.length || 0,
+    inProgress: safeGroupedTasks.in_progress?.length || 0,
+    review: safeGroupedTasks.review?.length || 0,
+    done: safeGroupedTasks.done?.length || 0,
   };
 
   const taskCompletionRate =
@@ -59,19 +73,19 @@ useEffect(() => {
         <div className="flex items-center justify-between mb-4">
           <div>
             <p className="text-primary-100 text-sm mb-1">Overall Completion</p>
-            <p className="text-5xl font-bold">{progress.overallProgress}%</p>
+            <p className="text-5xl font-bold">{progress.overallProgress || 0}%</p>
           </div>
           <div className="text-right">
             <p className="text-primary-100 text-sm mb-1">Milestones</p>
             <p className="text-3xl font-bold">
-              {progress.statistics.completedMilestones}/{progress.statistics.totalMilestones}
+              {progress.statistics?.completedMilestones || 0}/{progress.statistics?.totalMilestones || 0}
             </p>
           </div>
         </div>
         <div className="w-full bg-primary-800 rounded-full h-4">
           <div
             className="bg-white h-4 rounded-full transition-all"
-            style={{ width: `${progress.overallProgress}%` }}
+            style={{ width: `${progress.overallProgress || 0}%` }}
           ></div>
         </div>
       </div>
@@ -85,7 +99,7 @@ useEffect(() => {
             <span className="text-3xl">🎯</span>
           </div>
           <p className="text-3xl font-bold text-gray-800">
-            {progress.statistics.totalMilestones}
+            {progress.statistics?.totalMilestones || 0}
           </p>
         </div>
 
@@ -95,7 +109,7 @@ useEffect(() => {
             <span className="text-3xl">✅</span>
           </div>
           <p className="text-3xl font-bold text-green-600">
-            {progress.statistics.completedMilestones}
+            {progress.statistics?.completedMilestones || 0}
           </p>
         </div>
 
@@ -105,7 +119,7 @@ useEffect(() => {
             <span className="text-3xl">⚡</span>
           </div>
           <p className="text-3xl font-bold text-blue-600">
-            {progress.statistics.inProgressMilestones}
+            {progress.statistics?.inProgressMilestones || 0}
           </p>
         </div>
 
@@ -115,7 +129,7 @@ useEffect(() => {
             <span className="text-3xl">⚠️</span>
           </div>
           <p className="text-3xl font-bold text-red-600">
-            {progress.statistics.overdueMilestones}
+            {progress.statistics?.overdueMilestones || 0}
           </p>
         </div>
       </div>
@@ -212,7 +226,7 @@ useEffect(() => {
                     </div>
                     <div className="text-right ml-4">
                       <div className="text-2xl font-bold text-gray-800">
-                        {milestone.progress}%
+                        {milestone.progress || 0}%
                       </div>
                       <span
                         className={`text-xs px-2 py-1 rounded-full ${
@@ -221,7 +235,7 @@ useEffect(() => {
                             : 'bg-gray-100 text-gray-800'
                         }`}
                       >
-                        {milestone.status.replace('_', ' ')}
+                        {milestone.status?.replace('_', ' ') || 'pending'}
                       </span>
                     </div>
                   </div>
@@ -234,7 +248,7 @@ useEffect(() => {
                           ? 'bg-yellow-600'
                           : 'bg-blue-600'
                       }`}
-                      style={{ width: `${milestone.progress}%` }}
+                      style={{ width: `${milestone.progress || 0}%` }}
                     ></div>
                   </div>
                 </div>
@@ -260,7 +274,7 @@ useEffect(() => {
             </div>
           )}
 
-          {progress.statistics.overdueMilestones > 0 && (
+          {progress.statistics?.overdueMilestones > 0 && (
             <div className="flex items-start gap-3 p-3 bg-red-50 rounded-lg">
               <span className="text-2xl">⚠️</span>
               <div>
@@ -285,8 +299,8 @@ useEffect(() => {
             </div>
           )}
 
-          {progress.statistics.inProgressMilestones === 0 &&
-            progress.statistics.completedMilestones < progress.statistics.totalMilestones && (
+          {progress.statistics?.inProgressMilestones === 0 &&
+            progress.statistics?.completedMilestones < progress.statistics?.totalMilestones && (
               <div className="flex items-start gap-3 p-3 bg-blue-50 rounded-lg">
                 <span className="text-2xl">🚀</span>
                 <div>
