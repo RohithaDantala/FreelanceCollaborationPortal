@@ -5,7 +5,6 @@ import api from '../services/api';
 
 const ProjectReports = () => {
   const { id } = useParams();
-  const { user } = useSelector((state) => state.auth);
   const [reports, setReports] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [generating, setGenerating] = useState({
@@ -13,8 +12,6 @@ const ProjectReports = () => {
     milestone: false,
     summary: false,
   });
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
   const [dateRange, setDateRange] = useState({
     startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 days ago
     endDate: new Date().toISOString().split('T')[0],

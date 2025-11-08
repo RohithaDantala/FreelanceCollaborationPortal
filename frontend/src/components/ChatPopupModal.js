@@ -1,3 +1,4 @@
+// frontend/src/components/ChatPopupModal.js - FIXED SCROLLING & STYLING
 import React, { useState, useEffect, useRef } from 'react';
 import { useSelector } from 'react-redux';
 import io from 'socket.io-client';
@@ -9,11 +10,31 @@ const ChatPopupModal = ({ projectId, isOpen, onClose, minimized, onToggleMinimiz
   const [typing, setTyping] = useState(null);
   const [onlineUsers, setOnlineUsers] = useState([]);
   const messagesEndRef = useRef(null);
+  const messagesContainerRef = useRef(null);
   const socketRef = useRef(null);
   const typingTimeoutRef = useRef(null);
+  const isUserScrollingRef = useRef(false);
   
   const { user } = useSelector(state => state.auth);
   const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+
+  // Handle scroll detection
+  const handleScroll = () => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+
+    const { scrollTop, scrollHeight, clientHeight } = container;
+    const isAtBottom = scrollHeight - scrollTop - clientHeight < 50;
+    
+    isUserScrollingRef.current = !isAtBottom;
+  };
+
+  // Smooth scroll to bottom
+  const scrollToBottom = (force = false) => {
+    if (force || !isUserScrollingRef.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
 
   useEffect(() => {
     if (!isOpen || !projectId) return;
@@ -27,6 +48,10 @@ const ChatPopupModal = ({ projectId, isOpen, onClose, minimized, onToggleMinimiz
 
     socketRef.current.on('new_message', (message) => {
       setMessages(prev => [...prev, message]);
+      // Auto-scroll only for own messages
+      if (message.sender?._id === user?.id || message.sender === user?.id) {
+        setTimeout(() => scrollToBottom(true), 100);
+      }
     });
 
     socketRef.current.on('user_typing', ({ userId, userName }) => {
@@ -50,9 +75,12 @@ const ChatPopupModal = ({ projectId, isOpen, onClose, minimized, onToggleMinimiz
     };
   }, [isOpen, projectId, user, API_URL]);
 
+  // Initial scroll after messages load
   useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+    if (messages.length > 0) {
+      setTimeout(() => scrollToBottom(true), 100);
+    }
+  }, [messages.length === 0 ? messages : null]); // Only on initial load
 
   const loadMessages = async () => {
     try {
@@ -65,10 +93,6 @@ const ChatPopupModal = ({ projectId, isOpen, onClose, minimized, onToggleMinimiz
     } catch (error) {
       console.error('Load messages error:', error);
     }
-  };
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
   const handleSendMessage = (e) => {
@@ -86,6 +110,8 @@ const ChatPopupModal = ({ projectId, isOpen, onClose, minimized, onToggleMinimiz
       socketRef.current.emit('send_message', messageData);
       setNewMessage('');
       socketRef.current.emit('stop_typing', projectId);
+      // Force scroll after sending
+      setTimeout(() => scrollToBottom(true), 100);
     } catch (error) {
       console.error('Send message error:', error);
     }
@@ -137,37 +163,43 @@ const ChatPopupModal = ({ projectId, isOpen, onClose, minimized, onToggleMinimiz
   }
 
   return (
-    <div className="fixed bottom-4 right-4 w-96 h-[600px] bg-white rounded-lg shadow-2xl flex flex-col z-50 border border-gray-200">
-      <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-4 rounded-t-lg flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <MessageCircle size={20} />
-          <div>
-            <h3 className="font-semibold">Project Chat</h3>
-            {onlineUsers.length > 0 && (
-              <p className="text-xs text-blue-100 flex items-center gap-1">
-                <Users size={12} />
-                {onlineUsers.length} online
-              </p>
-            )}
+    <div className="fixed bottom-4 right-4 w-96 h-[600px] bg-white rounded-lg shadow-2xl flex flex-col z-50 border border-gray-200 overflow-hidden">
+      <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-4 flex-shrink-0">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <MessageCircle size={20} />
+            <div>
+              <h3 className="font-semibold">Project Chat</h3>
+              {onlineUsers.length > 0 && (
+                <p className="text-xs text-blue-100 flex items-center gap-1">
+                  <Users size={12} />
+                  {onlineUsers.length} online
+                </p>
+              )}
+            </div>
           </div>
-        </div>
-        <div className="flex gap-2">
-          <button
-            onClick={onToggleMinimize}
-            className="hover:bg-blue-700 p-1 rounded transition-colors"
-          >
-            <Minimize2 size={18} />
-          </button>
-          <button
-            onClick={onClose}
-            className="hover:bg-blue-700 p-1 rounded transition-colors"
-          >
-            <X size={18} />
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={onToggleMinimize}
+              className="hover:bg-blue-700 p-1 rounded transition-colors"
+            >
+              <Minimize2 size={18} />
+            </button>
+            <button
+              onClick={onClose}
+              className="hover:bg-blue-700 p-1 rounded transition-colors"
+            >
+              <X size={18} />
+            </button>
+          </div>
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50">
+      <div 
+        ref={messagesContainerRef}
+        onScroll={handleScroll}
+        className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50"
+      >
         {messages.length === 0 ? (
           <div className="text-center text-gray-500 mt-8">
             <MessageCircle size={48} className="mx-auto mb-2 opacity-50" />
@@ -214,7 +246,7 @@ const ChatPopupModal = ({ projectId, isOpen, onClose, minimized, onToggleMinimiz
         <div ref={messagesEndRef} />
       </div>
 
-      <div className="p-4 border-t bg-white rounded-b-lg">
+      <div className="p-4 border-t bg-white flex-shrink-0">
         <div className="flex gap-2">
           <input
             type="text"
@@ -225,14 +257,15 @@ const ChatPopupModal = ({ projectId, isOpen, onClose, minimized, onToggleMinimiz
             }}
             onKeyPress={handleKeyPress}
             placeholder="Type a message..."
-            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
           />
           <button
             onClick={handleSendMessage}
             disabled={!newMessage.trim()}
-            className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white p-2 rounded-lg transition-colors"
+            className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white px-6 py-3 rounded-lg transition-all flex items-center gap-2 font-medium shadow-sm hover:shadow-md"
           >
             <Send size={20} />
+            <span>Send</span>
           </button>
         </div>
       </div>

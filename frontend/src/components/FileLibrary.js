@@ -12,7 +12,6 @@ import FileDetailModal from './FileDetailModal';
 const FileLibrary = ({ projectId }) => {
   const dispatch = useDispatch();
   const { files, isLoading, pagination } = useSelector((state) => state.files);
-  const { user } = useSelector((state) => state.auth);
 
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);

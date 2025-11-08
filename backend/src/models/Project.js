@@ -51,7 +51,7 @@ const projectSchema = new mongoose.Schema(
     timeline: {
       startDate: Date,
       endDate: Date,
-      estimatedDuration: String, // e.g., "2 weeks", "1 month"
+      estimatedDuration: String,
     },
     members: [
       {
@@ -61,7 +61,7 @@ const projectSchema = new mongoose.Schema(
         },
         role: {
           type: String,
-          enum: ['owner', 'member', 'viewer'],
+          enum: ['owner', 'member', 'viewer'], // ✅ Lowercase 'member', not 'Member'
           default: 'member',
         },
         joinedAt: {
@@ -109,7 +109,7 @@ const projectSchema = new mongoose.Schema(
         },
         status: {
           type: String,
-          enum: ['pending', 'accepted', 'rejected'],
+          enum: ['pending', 'accepted', 'rejected', 'removed'], // ✅ Added 'removed' for removed members
           default: 'pending',
         },
       },

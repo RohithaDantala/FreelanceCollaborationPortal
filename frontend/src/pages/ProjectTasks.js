@@ -11,8 +11,7 @@ const ProjectTasks = () => {
   const dispatch = useDispatch();
   const { currentProject: project } = useSelector((state) => state.projects);
   const { user } = useSelector((state) => state.auth);
-  const { groupedTasks } = useSelector((state) => state.tasks);
-  const { running, isLoading } = useSelector((state) => state.time);
+
 
   useEffect(() => {
     if (id) {

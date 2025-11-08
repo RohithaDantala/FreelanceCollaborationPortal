@@ -1,4 +1,4 @@
-// frontend/src/components/ProjectChat.js - FIXED VERSION
+// frontend/src/components/ProjectChat.js - FIXED SCROLLING & STYLING
 import React, { useState, useEffect, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import io from 'socket.io-client';
@@ -23,10 +23,33 @@ const ProjectChat = ({ projectId }) => {
   const [isConnected, setIsConnected] = useState(false);
   
   const messagesEndRef = useRef(null);
+  const messagesContainerRef = useRef(null);
   const typingTimeoutRef = useRef(null);
+  const isUserScrollingRef = useRef(false);
+  const lastScrollTopRef = useRef(0);
 
   const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
   const SOCKET_URL = API_URL.replace('/api', '');
+
+  // Handle scroll detection
+  const handleScroll = () => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+
+    const { scrollTop, scrollHeight, clientHeight } = container;
+    const isAtBottom = scrollHeight - scrollTop - clientHeight < 50;
+    
+    // User is scrolling if they're not at the bottom
+    isUserScrollingRef.current = !isAtBottom;
+    lastScrollTopRef.current = scrollTop;
+  };
+
+  // Smooth scroll to bottom only if user isn't manually scrolling
+  const scrollToBottom = (force = false) => {
+    if (force || !isUserScrollingRef.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
 
   // Initialize Socket.io
   useEffect(() => {
@@ -45,8 +68,6 @@ const ProjectChat = ({ projectId }) => {
     newSocket.on('connect', () => {
       console.log('✅ Socket connected:', newSocket.id);
       setIsConnected(true);
-      
-      // Join project room
       newSocket.emit('join_project', projectId);
     });
 
@@ -59,38 +80,38 @@ const ProjectChat = ({ projectId }) => {
       console.error('Socket error:', error);
     });
 
-    // Listen for recent messages when joining
     newSocket.on('recent_messages', (recentMessages) => {
       console.log('📨 Received recent messages:', recentMessages.length);
       dispatch(clearMessages());
       recentMessages.forEach((msg) => dispatch(addMessage(msg)));
+      // Force scroll on initial load
+      setTimeout(() => scrollToBottom(true), 100);
     });
 
-    // Listen for new messages
     newSocket.on('new_message', (message) => {
       console.log('📩 New message received:', message);
       dispatch(addMessage(message));
+      // Only auto-scroll if it's the user's own message
+      if (message.sender?._id === user.id || message.sender === user.id) {
+        setTimeout(() => scrollToBottom(true), 100);
+      }
     });
 
-    // Listen for message edits
     newSocket.on('message_edited', (message) => {
       console.log('✏️ Message edited:', message);
       dispatch(updateMessage(message));
     });
 
-    // Listen for message deletions
     newSocket.on('message_deleted', ({ messageId }) => {
       console.log('🗑️ Message deleted:', messageId);
       dispatch(removeMessage(messageId));
     });
 
-    // Listen for online users
     newSocket.on('online_users', (users) => {
       console.log('👥 Online users:', users);
       setOnlineUsers(users);
     });
 
-    // Listen for typing indicators
     newSocket.on('user_typing', (data) => {
       if (data.userId !== user.id) {
         setTypingUsers((prev) => {
@@ -125,9 +146,17 @@ const ProjectChat = ({ projectId }) => {
     };
   }, [projectId, dispatch]);
 
-  // Scroll to bottom
+  // Scroll to bottom when messages load initially
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (messages.length > 0 && messagesContainerRef.current) {
+      const container = messagesContainerRef.current;
+      const isAtBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100;
+      
+      // Only auto-scroll if user is near bottom
+      if (isAtBottom || messages.length === 1) {
+        scrollToBottom();
+      }
+    }
   }, [messages]);
 
   const handleTyping = () => {
@@ -164,6 +193,9 @@ const ProjectChat = ({ projectId }) => {
       clearTimeout(typingTimeoutRef.current);
     }
     socket.emit('stop_typing', { projectId });
+    
+    // Force scroll after sending
+    setTimeout(() => scrollToBottom(true), 100);
   };
 
   const handleKeyPress = (e) => {
@@ -209,9 +241,9 @@ const ProjectChat = ({ projectId }) => {
   }, {});
 
   return (
-    <div className="flex flex-col h-[600px] bg-white rounded-lg shadow-lg">
+    <div className="flex flex-col h-[600px] bg-white rounded-lg shadow-lg overflow-hidden">
       {/* Header */}
-      <div className="bg-primary-600 text-white px-6 py-4 rounded-t-lg">
+      <div className="bg-primary-600 text-white px-6 py-4 flex-shrink-0">
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-lg font-semibold">💬 Project Chat</h3>
@@ -232,7 +264,12 @@ const ProjectChat = ({ projectId }) => {
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div 
+        ref={messagesContainerRef}
+        onScroll={handleScroll}
+        className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50"
+        style={{ scrollBehavior: 'smooth' }}
+      >
         {Object.keys(groupedMessages).length === 0 ? (
           <div className="flex items-center justify-center h-full text-gray-400">
             <div className="text-center">
@@ -289,7 +326,7 @@ const ProjectChat = ({ projectId }) => {
                       className={`max-w-[70%] ${
                         isOwnMessage
                           ? 'bg-primary-600 text-white'
-                          : 'bg-gray-100 text-gray-800'
+                          : 'bg-white text-gray-800'
                       } rounded-lg px-4 py-2 shadow-sm`}
                     >
                       {!isOwnMessage && showAvatar && (
@@ -351,14 +388,14 @@ const ProjectChat = ({ projectId }) => {
       </div>
 
       {/* Input */}
-      <div className="border-t p-4 bg-gray-50 rounded-b-lg">
+      <div className="border-t p-4 bg-white flex-shrink-0">
         {!isConnected && (
           <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 text-sm px-3 py-2 rounded-lg mb-3 flex items-center gap-2">
             <span>⚠️</span>
             <span>Reconnecting to chat...</span>
           </div>
         )}
-        <div className="flex gap-2">
+        <div className="flex gap-3">
           <input
             type="text"
             value={newMessage}
@@ -369,12 +406,12 @@ const ProjectChat = ({ projectId }) => {
             onKeyPress={handleKeyPress}
             placeholder="Type your message... (Press Enter to send)"
             disabled={!isConnected}
-            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+            className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed transition-all"
           />
           <button
             onClick={handleSendMessage}
             disabled={!newMessage.trim() || !isConnected}
-            className="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2"
+            className="px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-all flex items-center gap-2 font-medium shadow-sm hover:shadow-md"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -384,7 +421,7 @@ const ProjectChat = ({ projectId }) => {
                 d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
               />
             </svg>
-            <span className="hidden sm:inline">Send</span>
+            <span>Send</span>
           </button>
         </div>
       </div>

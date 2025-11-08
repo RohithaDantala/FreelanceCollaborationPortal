@@ -4,7 +4,6 @@ import {
   getProjectTasks,
   updateTask,
   deleteTask,
-  reorderTasks,
   updateTasksOptimistically,
   reset,
 } from '../redux/slices/taskSlice';

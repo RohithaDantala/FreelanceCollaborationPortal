@@ -25,7 +25,7 @@ const ProjectDetail = () => {
 
   const [applicationMessage, setApplicationMessage] = useState('');
   const [showApplicationModal, setShowApplicationModal] = useState(false);
-
+  const [resumeFile, setResumeFile] = useState(null);
   useEffect(() => {
     dispatch(getProject(id));
     return () => {
@@ -89,18 +89,29 @@ const ProjectDetail = () => {
     }
   };
 
-  const handleAcceptReject = async (applicantId, status) => {
-    const action = status === 'accepted' ? 'accept' : 'reject';
-    if (window.confirm(`Are you sure you want to ${action} this application?`)) {
-      try {
-        await dispatch(handleApplication({ projectId: project._id, applicantId, status })).unwrap();
-        // Force refresh to get updated data
-        await dispatch(getProject(project._id));
-      } catch (error) {
-        alert('Failed to handle application');
-      }
+// Replace the handleAcceptReject function in your ProjectDetail.js (around line 107)
+
+const handleAcceptReject = async (applicantId, action) => {
+  // action will be 'approve' or 'reject'
+  const actionText = action === 'approve' ? 'approve' : 'reject';
+  
+  if (window.confirm(`Are you sure you want to ${actionText} this application?`)) {
+    try {
+      await dispatch(
+        handleApplication({ 
+          projectId: project._id, 
+          applicantId, 
+          action  // ✅ Send 'action' instead of 'status'
+        })
+      ).unwrap();
+      
+      // Force refresh to get updated data
+      await dispatch(getProject(project._id));
+    } catch (error) {
+      alert(error || 'Failed to handle application');
     }
-  };
+  }
+};
 
   const handleRemoveMember = async (memberId) => {
     if (window.confirm('Are you sure you want to remove this member?')) {
@@ -468,13 +479,13 @@ const ProjectDetail = () => {
                           )}
                           <div className="flex gap-2">
                             <button
-                              onClick={() => handleAcceptReject(applicant.user._id, 'accepted')}
+                              onClick={() => handleAcceptReject(applicant.user._id, 'approve')}
                               className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm"
                             >
                               ✓ Accept
                             </button>
                             <button
-                              onClick={() => handleAcceptReject(applicant.user._id, 'rejected')}
+                              onClick={() => handleAcceptReject(applicant.user._id, 'reject')}
                               className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm"
                             >
                               Reject
@@ -487,52 +498,52 @@ const ProjectDetail = () => {
               )}
             </div>
 
-            {/* Sidebar - Project Info */}
-            <div className="lg:col-span-1">
-              <div className="bg-white rounded-lg shadow-md p-6">
-                <h2 className="text-lg font-semibold text-gray-800 mb-4">Project Details</h2>
-                <div className="space-y-3">
-                  {project.budget && (project.budget.min > 0 || project.budget.max > 0) && (
+              {/* Sidebar - Project Info */}
+              <div className="lg:col-span-1">
+                <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+                  <h2 className="text-lg font-semibold text-gray-800 mb-4">Project Details</h2>
+                  <div className="space-y-3">
+                    {project.budget && (project.budget.min > 0 || project.budget.max > 0) && (
+                      <div>
+                        <p className="text-sm text-gray-500">Budget</p>
+                        <p className="font-medium text-gray-800">
+                          ${project.budget.min} - ${project.budget.max} {project.budget.currency}
+                        </p>
+                      </div>
+                    )}
+                    {project.timeline?.estimatedDuration && (
+                      <div>
+                        <p className="text-sm text-gray-500">Duration</p>
+                        <p className="font-medium text-gray-800">
+                          {project.timeline.estimatedDuration}
+                        </p>
+                      </div>
+                    )}
                     <div>
-                      <p className="text-sm text-gray-500">Budget</p>
+                      <p className="text-sm text-gray-500">Created</p>
                       <p className="font-medium text-gray-800">
-                        ${project.budget.min} - ${project.budget.max} {project.budget.currency}
+                        {new Date(project.createdAt).toLocaleDateString()}
                       </p>
                     </div>
-                  )}
-                  {project.timeline?.estimatedDuration && (
                     <div>
-                      <p className="text-sm text-gray-500">Duration</p>
+                      <p className="text-sm text-gray-500">Last Updated</p>
                       <p className="font-medium text-gray-800">
-                        {project.timeline.estimatedDuration}
+                        {new Date(project.updatedAt).toLocaleDateString()}
                       </p>
                     </div>
-                  )}
-                  <div>
-                    <p className="text-sm text-gray-500">Created</p>
-                    <p className="font-medium text-gray-800">
-                      {new Date(project.createdAt).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-500">Last Updated</p>
-                    <p className="font-medium text-gray-800">
-                      {new Date(project.updatedAt).toLocaleDateString()}
-                    </p>
                   </div>
                 </div>
-              </div>
 
-              {/* ProjectChat Component - Only for members */}
-              {isMember && (
-                <div className="mt-6">
-                  <ProjectChat projectId={project._id} />
-                </div>
-              )}
+                {/* ProjectChat Component - Only for members - FIXED: Sticky positioning */}
+                {isMember && (
+                  <div className="sticky top-4">
+                    <ProjectChat projectId={project._id} />
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
       {/* Application Modal */}
       {showApplicationModal && (

@@ -3,7 +3,7 @@ const Project = require('../models/Project');
 const User = require('../models/User');
 const Notification = require('../models/Notification');
 const { AppError } = require('../middleware/errorHandler');
-const { sendEmail, emailTemplates } = require('../config/email');
+const { sendEmail, emailTemplates } = require('../services/emailService');
 
 // @desc    Create new project
 // @route   POST /api/projects
@@ -371,116 +371,369 @@ exports.applyToProject = async (req, res, next) => {
 // @desc    Handle application (accept/reject)
 // @route   PUT /api/projects/:id/applicants/:applicantId
 // @access  Private (Owner only)
-exports.handleApplication = async (req, res, next) => {
-  try {
-    const { status } = req.body; // 'accepted' or 'rejected'
+// backend/src/controllers/projectController.js
+// Add this function or update your existing handleApplication function
 
-    if (!['accepted', 'rejected'].includes(status)) {
-      return next(new AppError('Invalid status', 400));
-    }
+const Project = require('../models/Project');
+const User = require('../models/User');
+const asyncHandler = require('express-async-handler');
 
-    const project = await Project.findById(req.params.id).populate(
-      'owner',
-      'firstName lastName'
-    );
+// @desc    Create a new project
+// @route   POST /api/projects
+// @access  Private
+const createProject = asyncHandler(async (req, res) => {
+  const projectData = {
+    ...req.body,
+    owner: req.user._id,
+  };
 
-    if (!project) {
-      return next(new AppError('Project not found', 404));
-    }
+  const project = await Project.create(projectData);
+  const populatedProject = await Project.findById(project._id)
+    .populate('owner', 'firstName lastName email avatar')
+    .populate('members.user', 'firstName lastName email avatar');
 
-    if (project.owner._id.toString() !== req.user.id) {
-      return next(
-        new AppError('Only project owner can handle applications', 403)
-      );
-    }
+  res.status(201).json({
+    success: true,
+    data: { project: populatedProject },
+  });
+});
 
-    const applicant = project.applicants.find(
-      (app) => app._id.toString() === req.params.applicantId
-    );
+// @desc    Get all projects (with filters)
+// @route   GET /api/projects
+// @access  Public
+const getAllProjects = asyncHandler(async (req, res) => {
+  const { category, status, search, page = 1, limit = 10 } = req.query;
 
-    if (!applicant) {
-      return next(new AppError('Applicant not found', 404));
-    }
+  const query = { isPublic: true };
 
-    if (status === 'accepted') {
-      if (project.isFull) {
-        return next(new AppError('Project is full', 400));
-      }
-
-      project.members.push({
-        user: applicant.user,
-        role: 'member',
-      });
-
-      applicant.status = 'accepted';
-
-      await Notification.createNotification({
-        recipient: applicant.user,
-        sender: req.user.id,
-        type: 'application_accepted',
-        title: 'Application Accepted',
-        message: `Your application for ${project.title} has been accepted!`,
-        link: `/projects/${project._id}`,
-        project: project._id,
-      });
-
-      // Send email
-      const applicantUser = await User.findById(applicant.user);
-      if (applicantUser) {
-        try {
-          await sendEmail(
-            applicantUser.email,
-            emailTemplates.applicationApproved({
-              applicantName: applicantUser.firstName,
-              projectTitle: project.title,
-              clientName: `${project.owner.firstName} ${project.owner.lastName}`,
-              projectId: project._id,
-            })
-          );
-        } catch (error) {
-          console.error('Email send failed:', error);
-        }
-      }
-    } else {
-      applicant.status = 'rejected';
-
-      await Notification.createNotification({
-        recipient: applicant.user,
-        sender: req.user.id,
-        type: 'application_rejected',
-        title: 'Application Update',
-        message: `Your application for ${project.title} was not accepted`,
-        link: `/projects`,
-        project: project._id,
-      });
-
-      // Send email
-      const applicantUser = await User.findById(applicant.user);
-      if (applicantUser) {
-        try {
-          await sendEmail(
-            applicantUser.email,
-            emailTemplates.applicationRejected({
-              applicantName: applicantUser.firstName,
-              projectTitle: project.title,
-            })
-          );
-        } catch (error) {
-          console.error('Email send failed:', error);
-        }
-      }
-    }
-
-    await project.save();
-
-    res.status(200).json({
-      success: true,
-      message: `Application ${status} successfully`,
-      data: { project },
-    });
-  } catch (error) {
-    next(error);
+  if (category && category !== 'all') query.category = category;
+  if (status && status !== 'all') query.status = status;
+  if (search) {
+    query.$or = [
+      { title: { $regex: search, $options: 'i' } },
+      { description: { $regex: search, $options: 'i' } },
+    ];
   }
+
+  const skip = (parseInt(page) - 1) * parseInt(limit);
+
+  const projects = await Project.find(query)
+    .populate('owner', 'firstName lastName email avatar')
+    .populate('members.user', 'firstName lastName email avatar')
+    .sort({ createdAt: -1 })
+    .skip(skip)
+    .limit(parseInt(limit));
+
+  const total = await Project.countDocuments(query);
+
+  res.json({
+    success: true,
+    data: {
+      projects,
+      totalPages: Math.ceil(total / parseInt(limit)),
+      currentPage: parseInt(page),
+      totalProjects: total,
+    },
+  });
+});
+
+// @desc    Get single project
+// @route   GET /api/projects/:id
+// @access  Public
+const getProject = asyncHandler(async (req, res) => {
+  const project = await Project.findById(req.params.id)
+    .populate('owner', 'firstName lastName email avatar')
+    .populate('members.user', 'firstName lastName email avatar')
+    .populate('applicants.user', 'firstName lastName email avatar');
+
+  if (!project) {
+    res.status(404);
+    throw new Error('Project not found');
+  }
+
+  res.json({
+    success: true,
+    data: { project },
+  });
+});
+
+// @desc    Get my projects
+// @route   GET /api/projects/user/my-projects
+// @access  Private
+const getMyProjects = asyncHandler(async (req, res) => {
+  const { status } = req.query;
+  const query = {
+    $or: [
+      { owner: req.user._id },
+      { 'members.user': req.user._id }
+    ]
+  };
+
+  if (status && status !== 'all') {
+    query.status = status;
+  }
+
+  const projects = await Project.find(query)
+    .populate('owner', 'firstName lastName email avatar')
+    .populate('members.user', 'firstName lastName email avatar')
+    .sort({ updatedAt: -1 });
+
+  res.json({
+    success: true,
+    data: { projects },
+  });
+});
+
+// @desc    Update project
+// @route   PUT /api/projects/:id
+// @access  Private (Owner only)
+const updateProject = asyncHandler(async (req, res) => {
+  const project = await Project.findById(req.params.id);
+
+  if (!project) {
+    res.status(404);
+    throw new Error('Project not found');
+  }
+
+  if (project.owner.toString() !== req.user._id.toString()) {
+    res.status(403);
+    throw new Error('Not authorized to update this project');
+  }
+
+  const updatedProject = await Project.findByIdAndUpdate(
+    req.params.id,
+    req.body,
+    { new: true, runValidators: true }
+  )
+    .populate('owner', 'firstName lastName email avatar')
+    .populate('members.user', 'firstName lastName email avatar');
+
+  res.json({
+    success: true,
+    data: { project: updatedProject },
+  });
+});
+
+// @desc    Delete project
+// @route   DELETE /api/projects/:id
+// @access  Private (Owner only)
+const deleteProject = asyncHandler(async (req, res) => {
+  const project = await Project.findById(req.params.id);
+
+  if (!project) {
+    res.status(404);
+    throw new Error('Project not found');
+  }
+
+  if (project.owner.toString() !== req.user._id.toString()) {
+    res.status(403);
+    throw new Error('Not authorized to delete this project');
+  }
+
+  await project.deleteOne();
+
+  res.json({
+    success: true,
+    data: {},
+  });
+});
+
+// @desc    Apply to join a project
+// @route   POST /api/projects/:id/apply
+// @access  Private
+const applyToProject = asyncHandler(async (req, res) => {
+  const project = await Project.findById(req.params.id);
+
+  if (!project) {
+    res.status(404);
+    throw new Error('Project not found');
+  }
+
+  // Check if user is already a member
+  const isMember = project.members.some(
+    (m) => m.user.toString() === req.user._id.toString()
+  );
+
+  if (isMember) {
+    res.status(400);
+    throw new Error('You are already a member of this project');
+  }
+
+  // Check if user has already applied
+  const hasApplied = project.applicants.some(
+    (a) => a.user.toString() === req.user._id.toString()
+  );
+
+  if (hasApplied) {
+    res.status(400);
+    throw new Error('You have already applied to this project');
+  }
+
+  // Check if project is full
+  if (project.members.length >= project.maxMembers) {
+    res.status(400);
+    throw new Error('This project is full');
+  }
+
+  // Add application
+  project.applicants.push({
+    user: req.user._id,
+    message: req.body.message,
+    status: 'pending',
+  });
+
+  await project.save();
+
+  res.json({
+    success: true,
+    message: 'Application submitted successfully',
+  });
+});
+
+// @desc    Handle application (accept/reject)
+// @route   PUT /api/projects/:id/applicants/:applicantId
+// @access  Private (Owner only)
+const handleApplication = asyncHandler(async (req, res) => {
+  const { action } = req.body; // ✅ Expecting 'approve' or 'reject'
+  
+  const project = await Project.findById(req.params.id)
+    .populate('owner', 'firstName lastName email avatar')
+    .populate('members.user', 'firstName lastName email avatar')
+    .populate('applicants.user', 'firstName lastName email avatar');
+
+  if (!project) {
+    res.status(404);
+    throw new Error('Project not found');
+  }
+
+  // Check if user is project owner
+  if (project.owner._id.toString() !== req.user._id.toString()) {
+    res.status(403);
+    throw new Error('Only project owner can handle applications');
+  }
+
+  // Find the application
+  const application = project.applicants.find(
+    (a) => a.user._id.toString() === req.params.applicantId
+  );
+
+  if (!application) {
+    res.status(404);
+    throw new Error('Application not found');
+  }
+
+  // ✅ Map 'approve' to 'accepted' and 'reject' to 'rejected'
+  if (action === 'approve') {
+    // Check if project is full
+    if (project.members.length >= project.maxMembers) {
+      res.status(400);
+      throw new Error('Project is full');
+    }
+
+    // Update application status to 'accepted' (NOT 'approved')
+    application.status = 'accepted';
+
+    // Add user to members with 'member' role (lowercase, NOT 'Member')
+    project.members.push({
+      user: application.user._id,
+      role: 'member',
+      joinedAt: new Date(),
+    });
+  } else if (action === 'reject') {
+    // Update application status to 'rejected'
+    application.status = 'rejected';
+  } else {
+    res.status(400);
+    throw new Error('Invalid action. Use "approve" or "reject"');
+  }
+
+  await project.save();
+
+  // Populate and return updated project
+  const updatedProject = await Project.findById(project._id)
+    .populate('owner', 'firstName lastName email avatar')
+    .populate('members.user', 'firstName lastName email avatar')
+    .populate('applicants.user', 'firstName lastName email avatar');
+
+  res.json({
+    success: true,
+    data: { project: updatedProject },
+  });
+});
+
+// @desc    Remove member from project
+// @route   DELETE /api/projects/:id/members/:memberId
+// @access  Private (Owner only)
+const removeMember = asyncHandler(async (req, res) => {
+  const project = await Project.findById(req.params.id);
+
+  if (!project) {
+    res.status(404);
+    throw new Error('Project not found');
+  }
+
+  if (project.owner.toString() !== req.user._id.toString()) {
+    res.status(403);
+    throw new Error('Only project owner can remove members');
+  }
+
+  // Find member
+  const memberIndex = project.members.findIndex(
+    (m) => m.user.toString() === req.params.memberId
+  );
+
+  if (memberIndex === -1) {
+    res.status(404);
+    throw new Error('Member not found');
+  }
+
+  // Can't remove owner
+  if (project.members[memberIndex].role === 'owner') {
+    res.status(400);
+    throw new Error('Cannot remove project owner');
+  }
+
+  // Remove member
+  project.members.splice(memberIndex, 1);
+
+  // Add to applicants with 'removed' status
+  const existingApplicant = project.applicants.find(
+    (a) => a.user.toString() === req.params.memberId
+  );
+
+  if (existingApplicant) {
+    existingApplicant.status = 'removed';
+  } else {
+    project.applicants.push({
+      user: req.params.memberId,
+      status: 'removed',
+      appliedAt: new Date(),
+    });
+  }
+
+  await project.save();
+
+  const updatedProject = await Project.findById(project._id)
+    .populate('owner', 'firstName lastName email avatar')
+    .populate('members.user', 'firstName lastName email avatar')
+    .populate('applicants.user', 'firstName lastName email avatar');
+
+  res.json({
+    success: true,
+    data: { project: updatedProject },
+  });
+});
+
+module.exports = {
+  createProject,
+  getAllProjects,
+  getProject,
+  getMyProjects,
+  updateProject,
+  deleteProject,
+  applyToProject,
+  handleApplication,
+  removeMember,
 };
 
 // @desc    Remove member from project

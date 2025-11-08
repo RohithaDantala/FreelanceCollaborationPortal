@@ -1,6 +1,6 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import api from '../../services/api';
-
+import axios from 'axios';
 const initialState = {
   projects: [],
   myProjects: [],
@@ -124,18 +124,34 @@ export const applyToProject = createAsyncThunk(
 );
 
 // Handle application (accept/reject)
+// In your redux/slices/projectSlice.js
+// Find the handleApplication thunk and update it:
+
 export const handleApplication = createAsyncThunk(
   'projects/handleApplication',
-  async ({ projectId, applicantId, status }, thunkAPI) => {
+  async ({ projectId, applicantId, action }, thunkAPI) => {
     try {
-      const response = await api.put(
-        `/projects/${projectId}/applicants/${applicantId}`,
-        { status }
+      const token = thunkAPI.getState().auth.token;
+      const config = {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      };
+
+      // ✅ FIXED: Send action in the request body
+      const response = await axios.put(
+        `/api/projects/${projectId}/applicants/${applicantId}`,
+        { action },  // ✅ This sends { action: 'approve' } or { action: 'reject' }
+        config
       );
-      return response.data.data.project;
+
+      return response.data;
     } catch (error) {
       const message =
-        error.response?.data?.message || error.message || 'Failed to handle application';
+        error.response?.data?.message ||
+        error.message ||
+        'Failed to handle application';
       return thunkAPI.rejectWithValue(message);
     }
   }

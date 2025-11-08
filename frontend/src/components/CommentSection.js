@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useSelector } from 'react-redux';
 import api from '../services/api';
 
@@ -11,11 +11,8 @@ const CommentSection = ({ projectId, taskId = null, fileId = null }) => {
   const [editContent, setEditContent] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  useEffect(() => {
-    fetchComments();
-  }, [projectId, taskId, fileId]);
-
-  const fetchComments = async () => {
+  // ✅ useCallback to memoize the function
+  const fetchComments = useCallback(async () => {
     try {
       setIsLoading(true);
       const params = new URLSearchParams();
@@ -30,7 +27,12 @@ const CommentSection = ({ projectId, taskId = null, fileId = null }) => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [projectId, taskId, fileId]); // dependencies
+
+  // ✅ useEffect now depends only on fetchComments
+  useEffect(() => {
+    fetchComments();
+  }, [fetchComments]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -83,7 +85,8 @@ const CommentSection = ({ projectId, taskId = null, fileId = null }) => {
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
             <span className="text-primary-600 text-xs font-semibold">
-              {comment.author?.firstName?.charAt(0)}{comment.author?.lastName?.charAt(0)}
+              {comment.author?.firstName?.charAt(0)}
+              {comment.author?.lastName?.charAt(0)}
             </span>
           </div>
           <div>
@@ -157,7 +160,6 @@ const CommentSection = ({ projectId, taskId = null, fileId = null }) => {
         </>
       )}
 
-      {/* Replies */}
       {!isReply && getReplies(comment._id).map((reply) => (
         <CommentItem key={reply._id} comment={reply} isReply={true} />
       ))}
@@ -170,7 +172,6 @@ const CommentSection = ({ projectId, taskId = null, fileId = null }) => {
         💬 Comments ({comments.length})
       </h3>
 
-      {/* New Comment Form */}
       <form onSubmit={handleSubmit} className="mb-6">
         {replyTo && (
           <div className="mb-2 p-2 bg-blue-50 rounded flex items-center justify-between">
@@ -200,7 +201,6 @@ const CommentSection = ({ projectId, taskId = null, fileId = null }) => {
         </button>
       </form>
 
-      {/* Comments List */}
       {isLoading ? (
         <div className="text-center py-8">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto"></div>
