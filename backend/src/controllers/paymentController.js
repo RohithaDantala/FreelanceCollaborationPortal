@@ -1,325 +1,283 @@
-// backend/src/controllers/paymentController.js
+// backend/controllers/paymentController.js - Fixed version
 const Payment = require('../models/Payment');
 const Project = require('../models/Project');
-const Milestone = require('../models/Milestone');
-const Notification = require('../models/Notification');
-const { AppError } = require('../middleware/errorHandler');
+const { createNotification } = require('./notificationController');
 
-// @desc    Create payment intent
-// @route   POST /api/payments/create-intent
-// @access  Private (Project Owner)
-exports.createPaymentIntent = async (req, res, next) => {
+// Create payment - FIXED
+exports.createPayment = async (req, res) => {
   try {
-    const { projectId, milestoneId, amount, currency, recipientId } = req.body;
+    const { projectId, recipientId, amount, currency, description, milestoneId } = req.body;
 
+    // Validate project exists and user is owner
     const project = await Project.findById(projectId);
     if (!project) {
-      return next(new AppError('Project not found', 404));
+      return res.status(404).json({
+        success: false,
+        message: 'Project not found'
+      });
     }
 
+    // Check if user is project owner
     if (project.owner.toString() !== req.user.id) {
-      return next(new AppError('Only project owner can create payments', 403));
+      return res.status(403).json({
+        success: false,
+        message: 'Only project owner can create payments'
+      });
     }
 
+    // Validate recipient is a project member
+    const isMember = project.members.some(
+      m => m.user.toString() === recipientId
+    );
+    
+    if (!isMember) {
+      return res.status(400).json({
+        success: false,
+        message: 'Recipient must be a project member'
+      });
+    }
+
+    // Create payment
     const payment = await Payment.create({
       project: projectId,
-      milestone: milestoneId || null,
       payer: req.user.id,
       recipient: recipientId,
       amount,
-      currency,
-      status: 'pending',
-      description: req.body.description || '',
+      currency: currency || 'USD',
+      description,
+      milestone: milestoneId || null,
+      status: 'pending'
     });
 
+    // Populate payment data before sending response
     await payment.populate([
       { path: 'payer', select: 'firstName lastName email' },
       { path: 'recipient', select: 'firstName lastName email' },
       { path: 'project', select: 'title' },
+      { path: 'milestone', select: 'title' }
     ]);
 
     // Create notification for recipient
-    await Notification.createNotification({
-      recipient: recipientId,
-      sender: req.user.id,
+    await createNotification({
+      userId: recipientId,
       type: 'payment_created',
-      title: 'Payment Initiated',
-      message: `A payment of ${amount} ${currency} has been initiated for your work`,
+      title: 'New Payment Created',
+      message: `A payment of ${currency} ${amount} has been created for you`,
       link: `/projects/${projectId}/payments`,
-      project: projectId,
+      relatedProject: projectId
     });
 
     res.status(201).json({
       success: true,
       message: 'Payment created successfully',
-      data: { payment },
+      data: { payment }
     });
   } catch (error) {
-    next(error);
+    console.error('Create payment error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to create payment'
+    });
   }
 };
 
-// @desc    Hold payment in escrow
-// @route   POST /api/payments/:id/escrow
-// @access  Private
-exports.holdInEscrow = async (req, res, next) => {
+// Get project payments - FIXED to show all payments
+exports.getProjectPayments = async (req, res) => {
   try {
-    const payment = await Payment.findById(req.params.id);
+    const { projectId } = req.params;
 
-    if (!payment) {
-      return next(new AppError('Payment not found', 404));
+    // Verify user is project member
+    const project = await Project.findById(projectId);
+    if (!project) {
+      return res.status(404).json({
+        success: false,
+        message: 'Project not found'
+      });
     }
 
-    if (payment.payer.toString() !== req.user.id) {
-      return next(new AppError('Unauthorized', 403));
+    const isMember = project.members.some(
+      m => m.user.toString() === req.user.id
+    ) || project.owner.toString() === req.user.id;
+
+    if (!isMember) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied'
+      });
     }
 
-    payment.status = 'held_in_escrow';
-    payment.escrowReleaseDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-    await payment.save();
+    // Get all payments for this project
+    const payments = await Payment.find({ project: projectId })
+      .populate('payer', 'firstName lastName email avatar')
+      .populate('recipient', 'firstName lastName email avatar')
+      .populate('milestone', 'title')
+      .sort({ createdAt: -1 });
 
-    await Notification.createNotification({
-      recipient: payment.recipient,
-      sender: req.user.id,
-      type: 'payment_escrowed',
-      title: 'Payment Held in Escrow',
-      message: `Payment of ${payment.amount} ${payment.currency} is now held in escrow`,
-      link: `/projects/${payment.project}/payments`,
-      project: payment.project,
-    });
+    // Calculate earnings by currency
+    const earnings = await Payment.aggregate([
+      { 
+        $match: { 
+          project: project._id,
+          status: { $in: ['released', 'held_in_escrow'] }
+        } 
+      },
+      {
+        $group: {
+          _id: '$currency',
+          totalAmount: { $sum: '$amount' },
+          count: { $sum: 1 }
+        }
+      }
+    ]);
 
     res.status(200).json({
       success: true,
-      message: 'Payment held in escrow',
-      data: { payment },
+      data: {
+        payments,
+        earnings
+      }
     });
   } catch (error) {
-    next(error);
+    console.error('Get payments error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to fetch payments'
+    });
   }
 };
 
-// @desc    Release payment from escrow
-// @route   POST /api/payments/:id/release
-// @access  Private
-exports.releasePayment = async (req, res, next) => {
+// Release payment from escrow - FIXED
+exports.releasePayment = async (req, res) => {
   try {
-    const payment = await Payment.findById(req.params.id);
+    const { id } = req.params;
+
+    const payment = await Payment.findById(id)
+      .populate('project')
+      .populate('recipient', 'firstName lastName email');
 
     if (!payment) {
-      return next(new AppError('Payment not found', 404));
+      return res.status(404).json({
+        success: false,
+        message: 'Payment not found'
+      });
     }
 
-    if (payment.payer.toString() !== req.user.id) {
-      return next(new AppError('Only payer can release payment', 403));
+    // Check if user is project owner
+    if (payment.project.owner.toString() !== req.user.id) {
+      return res.status(403).json({
+        success: false,
+        message: 'Only project owner can release payments'
+      });
     }
 
+    // Check payment status
     if (payment.status !== 'held_in_escrow') {
-      return next(new AppError('Payment is not in escrow', 400));
+      return res.status(400).json({
+        success: false,
+        message: 'Payment must be in escrow to be released'
+      });
     }
 
+    // Release payment
     payment.status = 'released';
     payment.releasedAt = Date.now();
     await payment.save();
 
-    await Notification.createNotification({
-      recipient: payment.recipient,
-      sender: req.user.id,
+    // Repopulate after save
+    await payment.populate([
+      { path: 'payer', select: 'firstName lastName email' },
+      { path: 'recipient', select: 'firstName lastName email' },
+      { path: 'milestone', select: 'title' }
+    ]);
+
+    // Create notification
+    await createNotification({
+      userId: payment.recipient._id,
       type: 'payment_released',
-      title: 'Payment Released!',
-      message: `Payment of ${payment.amount} ${payment.currency} has been released to you`,
-      link: `/projects/${payment.project}/payments`,
-      project: payment.project,
+      title: 'Payment Released',
+      message: `Payment of ${payment.currency} ${payment.amount} has been released`,
+      link: `/projects/${payment.project._id}/payments`,
+      relatedProject: payment.project._id
     });
 
     res.status(200).json({
       success: true,
       message: 'Payment released successfully',
-      data: { payment },
+      data: { payment }
     });
   } catch (error) {
-    next(error);
+    console.error('Release payment error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to release payment'
+    });
   }
 };
 
-// @desc    Request refund
-// @route   POST /api/payments/:id/refund
-// @access  Private
-exports.requestRefund = async (req, res, next) => {
+// Hold payment in escrow - FIXED
+exports.holdInEscrow = async (req, res) => {
   try {
-    const { reason } = req.body;
-    const payment = await Payment.findById(req.params.id);
+    const { id } = req.params;
+    const { escrowDays = 7 } = req.body;
+
+    const payment = await Payment.findById(id)
+      .populate('project')
+      .populate('recipient', 'firstName lastName email');
 
     if (!payment) {
-      return next(new AppError('Payment not found', 404));
+      return res.status(404).json({
+        success: false,
+        message: 'Payment not found'
+      });
     }
 
-    if (payment.payer.toString() !== req.user.id) {
-      return next(new AppError('Unauthorized', 403));
+    // Check if user is project owner
+    if (payment.project.owner.toString() !== req.user.id) {
+      return res.status(403).json({
+        success: false,
+        message: 'Only project owner can hold payments in escrow'
+      });
     }
 
-    if (payment.status === 'released') {
-      return next(new AppError('Cannot refund released payment', 400));
+    if (payment.status !== 'pending') {
+      return res.status(400).json({
+        success: false,
+        message: 'Only pending payments can be held in escrow'
+      });
     }
 
-    payment.status = 'refunded';
-    payment.refundedAt = Date.now();
-    payment.refundReason = reason;
+    // Hold in escrow
+    payment.status = 'held_in_escrow';
+    payment.escrowReleaseDate = new Date(Date.now() + escrowDays * 24 * 60 * 60 * 1000);
     await payment.save();
 
-    await Notification.createNotification({
-      recipient: payment.recipient,
-      sender: req.user.id,
-      type: 'payment_refunded',
-      title: 'Payment Refunded',
-      message: `Payment of ${payment.amount} ${payment.currency} has been refunded`,
-      link: `/projects/${payment.project}/payments`,
-      project: payment.project,
+    // Repopulate after save
+    await payment.populate([
+      { path: 'payer', select: 'firstName lastName email' },
+      { path: 'recipient', select: 'firstName lastName email' },
+      { path: 'milestone', select: 'title' }
+    ]);
+
+    // Create notification
+    await createNotification({
+      userId: payment.recipient._id,
+      type: 'payment_escrowed',
+      title: 'Payment Held in Escrow',
+      message: `Payment of ${payment.currency} ${payment.amount} is now in escrow`,
+      link: `/projects/${payment.project._id}/payments`,
+      relatedProject: payment.project._id
     });
 
     res.status(200).json({
       success: true,
-      message: 'Payment refunded successfully',
-      data: { payment },
+      message: 'Payment held in escrow successfully',
+      data: { payment }
     });
   } catch (error) {
-    next(error);
-  }
-};
-
-// @desc    Create dispute
-// @route   POST /api/payments/:id/dispute
-// @access  Private
-exports.createDispute = async (req, res, next) => {
-  try {
-    const { reason } = req.body;
-    const payment = await Payment.findById(req.params.id);
-
-    if (!payment) {
-      return next(new AppError('Payment not found', 404));
-    }
-
-    const isInvolved =
-      payment.payer.toString() === req.user.id ||
-      payment.recipient.toString() === req.user.id;
-
-    if (!isInvolved) {
-      return next(new AppError('Unauthorized', 403));
-    }
-
-    payment.status = 'disputed';
-    payment.dispute = {
-      reason,
-      createdAt: Date.now(),
-    };
-    await payment.save();
-
-    const otherParty =
-      payment.payer.toString() === req.user.id ? payment.recipient : payment.payer;
-
-    await Notification.createNotification({
-      recipient: otherParty,
-      sender: req.user.id,
-      type: 'payment_disputed',
-      title: 'Payment Disputed',
-      message: `A dispute has been raised for payment of ${payment.amount} ${payment.currency}`,
-      link: `/projects/${payment.project}/payments`,
-      project: payment.project,
+    console.error('Hold in escrow error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to hold payment in escrow'
     });
-
-    res.status(200).json({
-      success: true,
-      message: 'Dispute created successfully',
-      data: { payment },
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-// @desc    Get project payments
-// @route   GET /api/projects/:projectId/payments
-// @access  Private
-exports.getProjectPayments = async (req, res, next) => {
-  try {
-    const { projectId } = req.params;
-    const { status, page = 1, limit = 20 } = req.query;
-
-    const project = await Project.findById(projectId);
-    if (!project) {
-      return next(new AppError('Project not found', 404));
-    }
-
-    const isMember = project.members.some((m) => m.user.toString() === req.user.id);
-    if (!isMember) {
-      return next(new AppError('Unauthorized', 403));
-    }
-
-    const query = { project: projectId };
-    if (status) query.status = status;
-
-    const payments = await Payment.find(query)
-      .populate('payer', 'firstName lastName email avatar')
-      .populate('recipient', 'firstName lastName email avatar')
-      .populate('milestone', 'title')
-      .limit(limit * 1)
-      .skip((page - 1) * limit)
-      .sort({ createdAt: -1 });
-
-    const count = await Payment.countDocuments(query);
-    const earnings = await Payment.getProjectEarnings(projectId);
-
-    res.status(200).json({
-      success: true,
-      data: {
-        payments,
-        earnings,
-        totalPages: Math.ceil(count / limit),
-        currentPage: parseInt(page),
-        totalPayments: count,
-      },
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-// @desc    Get user payments
-// @route   GET /api/payments/my-payments
-// @access  Private
-exports.getMyPayments = async (req, res, next) => {
-  try {
-    const { type = 'all', page = 1, limit = 20 } = req.query;
-
-    let query = {};
-    if (type === 'sent') {
-      query.payer = req.user.id;
-    } else if (type === 'received') {
-      query.recipient = req.user.id;
-    } else {
-      query.$or = [{ payer: req.user.id }, { recipient: req.user.id }];
-    }
-
-    const payments = await Payment.find(query)
-      .populate('payer', 'firstName lastName email avatar')
-      .populate('recipient', 'firstName lastName email avatar')
-      .populate('project', 'title')
-      .populate('milestone', 'title')
-      .limit(limit * 1)
-      .skip((page - 1) * limit)
-      .sort({ createdAt: -1 });
-
-    const count = await Payment.countDocuments(query);
-
-    res.status(200).json({
-      success: true,
-      data: {
-        payments,
-        totalPages: Math.ceil(count / limit),
-        currentPage: parseInt(page),
-        totalPayments: count,
-      },
-    });
-  } catch (error) {
-    next(error);
   }
 };

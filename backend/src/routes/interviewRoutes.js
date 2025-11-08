@@ -1,4 +1,6 @@
+// backend/src/routes/interviewRoutes.js - FIXED
 const express = require('express');
+const { protect } = require('../middleware/auth');
 const {
   proposeInterviewDates,
   approveInterviewDate,
@@ -6,11 +8,6 @@ const {
   getInterview,
   cancelInterview,
 } = require('../controllers/interviewController');
-
-router.post('/propose', proposeInterviewDates);
-router.post('/:id/approve', approveInterviewDate);
-router.get('/', getMyInterviews);
-const { protect } = require('../middleware/auth');
 
 const router = express.Router();
 

@@ -2,8 +2,6 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const { errorHandler, notFound } = require('./middleware/errorHandler');
-const timeTrackingRoutes = require('./routes/timeTrackingRoutes');
-
 
 const app = express();
 
@@ -30,8 +28,8 @@ if (process.env.NODE_ENV === 'development') {
   });
 }
 
-  // Health check route
-  app.get('/api/health', (req, res) => {
+// Health check route
+app.get('/api/health', (req, res) => {
   res.status(200).json({
     success: true,
     message: 'Server is running',
@@ -40,7 +38,7 @@ if (process.env.NODE_ENV === 'development') {
   });
 });
 
-  // API routes
+// API routes
 try {
   app.use('/api/auth', require('./routes/authRoutes'));
   app.use('/api/users', require('./routes/userRoutes'));
@@ -54,7 +52,10 @@ try {
   app.use('/api/comments', require('./routes/commentRoutes'));
   app.use('/api', require('./routes/messageRoutes')); // Message routes
   app.use('/api/payments', require('./routes/paymentRoutes')); // Payment routes
-app.use('/api/time-tracking', timeTrackingRoutes);
+  app.use('/api/interviews', require('./routes/interviewRoutes')); // Interview routes
+  
+  // FIXED: Use only ONE time tracking route file
+  app.use('/api/time-tracking', require('./routes/timeTrackingRoutes'));
   
 } catch (error) {
   console.warn('⚠️ Some routes not found — create them under src/routes/');
