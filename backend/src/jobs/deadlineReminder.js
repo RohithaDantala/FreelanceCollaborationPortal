@@ -1,8 +1,10 @@
+// backend/src/jobs/deadlineReminder.js - COMPLETE VERSION
 const cron = require('node-cron');
 const Project = require('../models/Project');
 const Task = require('../models/Task');
 const Milestone = require('../models/Milestone');
 const Notification = require('../models/Notification');
+const User = require('../models/User');
 const { sendEmail, emailTemplates } = require('../config/email');
 
 // Helper function to calculate days difference
@@ -58,6 +60,7 @@ const checkDeadlines = async () => {
         });
         
         await sendEmail(task.assignee.email, emailTemplate);
+        console.log(`✅ Sent task deadline reminder to ${task.assignee.email}`);
       } catch (error) {
         console.error(`Failed to send deadline email to ${task.assignee.email}:`, error);
       }
@@ -76,7 +79,6 @@ const checkDeadlines = async () => {
     for (const milestone of upcomingMilestones) {
       const daysLeft = getDaysUntil(milestone.dueDate);
       
-      const Project = require('../models/Project');
       const project = await Project.findById(milestone.project._id)
         .populate('owner', 'firstName lastName email')
         .populate('members.user', 'firstName lastName email');
@@ -86,4 +88,82 @@ const checkDeadlines = async () => {
         recipient: project.owner._id,
         sender: project.owner._id,
         type: 'milestone_deadline',
-        title: `
+        title: `Milestone Deadline Approaching`,
+        message: `Milestone "${milestone.title}" is due in ${daysLeft} day${daysLeft !== 1 ? 's' : ''}`,
+        link: `/projects/${project._id}/milestones`,
+        project: project._id,
+      });
+
+      try {
+        const emailTemplate = emailTemplates.deadlineReminder({
+          userName: project.owner.firstName,
+          projectTitle: project.title,
+          deadline: new Date(milestone.dueDate).toLocaleDateString(),
+          daysLeft,
+          projectId: project._id,
+        });
+        
+        await sendEmail(project.owner.email, emailTemplate);
+        console.log(`✅ Sent milestone deadline reminder to ${project.owner.email}`);
+      } catch (error) {
+        console.error(`Failed to send milestone email to ${project.owner.email}:`, error);
+      }
+
+      // Send to all project members
+      for (const member of project.members) {
+        if (member.user._id.toString() === project.owner._id.toString()) continue;
+
+        await Notification.createNotification({
+          recipient: member.user._id,
+          sender: project.owner._id,
+          type: 'milestone_deadline',
+          title: `Milestone Deadline Approaching`,
+          message: `Milestone "${milestone.title}" is due in ${daysLeft} day${daysLeft !== 1 ? 's' : ''}`,
+          link: `/projects/${project._id}/milestones`,
+          project: project._id,
+        });
+
+        try {
+          const emailTemplate = emailTemplates.deadlineReminder({
+            userName: member.user.firstName,
+            projectTitle: project.title,
+            deadline: new Date(milestone.dueDate).toLocaleDateString(),
+            daysLeft,
+            projectId: project._id,
+          });
+          
+          await sendEmail(member.user.email, emailTemplate);
+          console.log(`✅ Sent milestone deadline reminder to ${member.user.email}`);
+        } catch (error) {
+          console.error(`Failed to send milestone email to ${member.user.email}:`, error);
+        }
+      }
+    }
+
+    console.log(`✅ Deadline check complete: ${upcomingTasks.length} tasks, ${upcomingMilestones.length} milestones`);
+  } catch (error) {
+    console.error('❌ Error in deadline reminder job:', error);
+  }
+};
+
+// Schedule the cron job to run every day at 9 AM
+const startDeadlineReminderJob = () => {
+  // Run every day at 9:00 AM
+  cron.schedule('0 9 * * *', checkDeadlines, {
+    timezone: 'UTC',
+  });
+
+  // Also run every hour during business hours (9 AM - 5 PM) for more timely reminders
+  cron.schedule('0 9-17 * * *', async () => {
+    console.log('🔔 Hourly deadline check...');
+    await checkDeadlines();
+  }, {
+    timezone: 'UTC',
+  });
+
+  console.log('✅ Deadline reminder cron jobs scheduled');
+  console.log('   - Daily check: 9:00 AM UTC');
+  console.log('   - Hourly checks: 9 AM - 5 PM UTC');
+};
+
+module.exports = { startDeadlineReminderJob, checkDeadlines };

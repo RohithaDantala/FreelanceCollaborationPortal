@@ -28,8 +28,8 @@ if (process.env.NODE_ENV === 'development') {
   });
 }
 
-// Health check route
-app.get('/api/health', (req, res) => {
+  // Health check route
+  app.get('/api/health', (req, res) => {
   res.status(200).json({
     success: true,
     message: 'Server is running',
@@ -38,7 +38,7 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// API routes
+  // API routes
 try {
   app.use('/api/auth', require('./routes/authRoutes'));
   app.use('/api/users', require('./routes/userRoutes'));
@@ -52,13 +52,13 @@ try {
   app.use('/api/comments', require('./routes/commentRoutes'));
   app.use('/api', require('./routes/messageRoutes')); // Message routes
   app.use('/api/payments', require('./routes/paymentRoutes')); // Payment routes
+  app.use('/api', require('./routes/timeRoutes')); // Time tracking routes
 } catch (error) {
   console.warn('⚠️ Some routes not found — create them under src/routes/');
 }
 
 // 404 handler - must be after all routes
 app.use(notFound);
-
 // Error handler - must be last
 app.use(errorHandler);
 
