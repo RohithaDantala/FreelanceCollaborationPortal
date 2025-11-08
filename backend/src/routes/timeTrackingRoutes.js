@@ -1,26 +1,34 @@
-// backend/src/routes/timeTrackingRoutes.js
+// backend/src/routes/timeTrackingRoutes.js - FIXED
 const express = require('express');
 const router = express.Router();
-const auth = require('../middleware/auth');
-const timeTrackingController = require('../controllers/timeTrackingController');
+const { protect } = require('../middleware/auth');
+const ctrl = require('../controllers/timeTrackingController');
 
-// Use auth.protect instead of just auth
-// Start timer
-router.post('/start', auth.protect, timeTrackingController.startTimer);
+// ✅ FIXED: Routes now match what frontend expects
+// When mounted at /api, these become:
+// POST /api/time/start
+// POST /api/time/stop
+// GET /api/time/running  ✅ This is what your frontend calls!
+// POST /api/time/entry
+// GET /api/time/entries
+// GET /api/time/summary
 
-// Stop timer
-router.put('/stop/:entryId?', auth.protect, timeTrackingController.stopTimer);
+// Start a new running timer
+router.post('/time/start', protect, ctrl.startTimer);
 
-// Get active (running) session
-router.get('/active', auth.protect, timeTrackingController.getRunning);
+// Stop running timer (optionally by entryId)
+router.post('/time/stop/:entryId?', protect, ctrl.stopTimer);
 
-// Create manual entry
-router.post('/', auth.protect, timeTrackingController.createEntry);
+// Get currently running timer ✅ FIXED: This route was missing!
+router.get('/time/running', protect, ctrl.getRunning);
 
-// Get my time entries
-router.get('/', auth.protect, timeTrackingController.getMyEntries);
+// Create a manual entry (with start/end)
+router.post('/time/entry', protect, ctrl.createEntry);
 
-// Get summary (daily/project stats)
-router.get('/summary', auth.protect, timeTrackingController.getSummary);
+// Get my entries with optional filters
+router.get('/time/entries', protect, ctrl.getMyEntries);
+
+// Get my time summary (per-day and by project)
+router.get('/time/summary', protect, ctrl.getSummary);
 
 module.exports = router;

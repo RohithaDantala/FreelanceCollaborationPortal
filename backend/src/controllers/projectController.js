@@ -1,4 +1,4 @@
-// backend/src/controllers/projectController.js - FINAL FIXED VERSION
+// backend/src/controllers/projectController.js - COMPLETE FIXED VERSION
 const Project = require('../models/Project');
 const User = require('../models/User');
 const Notification = require('../models/Notification');
@@ -293,7 +293,6 @@ exports.applyToProject = async (req, res, next) => {
 
     await project.save();
 
-    // Send notification to project owner
     await Notification.createNotification({
       recipient: project.owner._id,
       sender: req.user.id,
@@ -307,89 +306,6 @@ exports.applyToProject = async (req, res, next) => {
     res.status(200).json({
       success: true,
       message: 'Application submitted successfully',
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-// @desc    Handle application (accept/reject)
-// @route   PUT /api/projects/:id/applicants/:applicantId
-// @access  Private (Owner only)
-exports.handleApplication = async (req, res, next) => {
-  try {
-    const { action } = req.body; // 'approve' or 'reject'
-    
-    const project = await Project.findById(req.params.id)
-      .populate('owner', 'firstName lastName email avatar')
-      .populate('members.user', 'firstName lastName email avatar')
-      .populate('applicants.user', 'firstName lastName email avatar');
-
-    if (!project) {
-      return next(new AppError('Project not found', 404));
-    }
-
-    if (project.owner._id.toString() !== req.user.id) {
-      return next(new AppError('Only project owner can handle applications', 403));
-    }
-
-    const application = project.applicants.find(
-      (a) => a.user._id.toString() === req.params.applicantId
-    );
-
-    if (!application) {
-      return next(new AppError('Application not found', 404));
-    }
-
-    if (action === 'approve') {
-      if (project.members.length >= project.maxMembers) {
-        return next(new AppError('Project is full', 400));
-      }
-
-      application.status = 'accepted';
-
-      project.members.push({
-        user: application.user._id,
-        role: 'member',
-        joinedAt: new Date(),
-      });
-
-      // Send notification
-      await Notification.createNotification({
-        recipient: application.user._id,
-        sender: req.user.id,
-        type: 'application_accepted',
-        title: 'Application Approved!',
-        message: `Your application to ${project.title} has been approved`,
-        link: `/projects/${project._id}`,
-        project: project._id,
-      });
-    } else if (action === 'reject') {
-      application.status = 'rejected';
-
-      await Notification.createNotification({
-        recipient: application.user._id,
-        sender: req.user.id,
-        type: 'application_rejected',
-        title: 'Application Update',
-        message: `Your application to ${project.title} was not accepted`,
-        link: `/projects`,
-        project: project._id,
-      });
-    } else {
-      return next(new AppError('Invalid action. Use "approve" or "reject"', 400));
-    }
-
-    await project.save();
-
-    const updatedProject = await Project.findById(project._id)
-      .populate('owner', 'firstName lastName email avatar')
-      .populate('members.user', 'firstName lastName email avatar')
-      .populate('applicants.user', 'firstName lastName email avatar');
-
-    res.status(200).json({
-      success: true,
-      data: { project: updatedProject },
     });
   } catch (error) {
     next(error);
@@ -462,6 +378,164 @@ exports.removeMember = async (req, res, next) => {
       data: { project: updatedProject },
     });
   } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Handle application (accept/reject)
+// @route   PUT /api/projects/:id/applicants/:applicantId
+// @access  Private (Owner only)
+// COMPLETE FIXED VERSION - backend/src/controllers/projectController.js
+// Replace ONLY the handleApplication function
+
+// @desc    Handle application (accept/reject)  
+// @route   PUT /api/projects/:id/applicants/:applicantId
+// @access  Private (Owner only)
+exports.handleApplication = async (req, res, next) => {
+  try {
+    const { action } = req.body; // 'approve' or 'reject'
+    const projectId = req.params.id;
+    const applicantId = req.params.applicantId;
+    
+    console.log('🔄 handleApplication called:', { projectId, applicantId, action, ownerId: req.user.id });
+    
+    // Find project without population first
+    let project = await Project.findById(projectId);
+
+    if (!project) {
+      console.log('❌ Project not found');
+      return next(new AppError('Project not found', 404));
+    }
+
+    // Check ownership
+    if (project.owner.toString() !== req.user.id) {
+      console.log('❌ Not authorized - owner:', project.owner, 'user:', req.user.id);
+      return next(new AppError('Only project owner can handle applications', 403));
+    }
+
+    // Find the application
+    const applicationIndex = project.applicants.findIndex(
+      (a) => a.user.toString() === applicantId
+    );
+
+    if (applicationIndex === -1) {
+      console.log('❌ Application not found. Applicants:', project.applicants);
+      return next(new AppError('Application not found', 404));
+    }
+
+    console.log('✅ Found application at index:', applicationIndex);
+
+    if (action === 'approve') {
+      // Check if project is full
+      if (project.members.length >= project.maxMembers) {
+        console.log('❌ Project is full:', project.members.length, '/', project.maxMembers);
+        return next(new AppError('Project is full', 400));
+      }
+
+      // Check if user is already a member (compare as strings)
+      const alreadyMember = project.members.some(
+        (m) => m.user.toString() === applicantId
+      );
+
+      if (alreadyMember) {
+        console.log('⚠️ User is already a member');
+        return next(new AppError('User is already a project member', 400));
+      }
+
+      // Update application status to accepted
+      project.applicants[applicationIndex].status = 'accepted';
+      console.log('✅ Updated application status to accepted');
+
+      // Add user to members array with proper structure
+      project.members.push({
+        user: applicantId, // Use the string ID directly
+        role: 'member',
+        joinedAt: new Date(),
+      });
+
+      console.log('✅ Added user to members array. Total members:', project.members.length);
+
+      // Save the project
+      await project.save();
+      console.log('💾 Project saved successfully');
+
+      // Create notification
+      await createAndEmitNotification({
+        recipient: project.owner._id,
+        sender: req.user.id,
+        type: 'project_application',
+        title: 'New Project Application',
+        message: `${req.user.firstName} ${req.user.lastName} has applied to ${project.title}`,
+        link: `/projects/${project._id}`,
+        project: project._id,
+      });
+
+      // Example 2: In handleApplication function (accept)
+      await createAndEmitNotification({
+        recipient: applicantId,
+        sender: req.user.id,
+        type: 'application_accepted',
+        title: 'Application Approved!',
+        message: `Your application has been approved for ${project.title}`,
+        link: `/projects/${projectId}`,
+        project: projectId,
+      });
+
+      // Example 3: In removeMember function
+      await createAndEmitNotification({
+        recipient: removedMember.user,
+        sender: req.user.id,
+        type: 'member_removed',
+        title: 'Removed from Project',
+        message: `You have been removed from ${project.title}`,
+        link: `/projects`,
+        project: project._id,
+      });
+      console.log('✅ Notification created');
+
+    } else if (action === 'reject') {
+      // Just update the application status
+      project.applicants[applicationIndex].status = 'rejected';
+      await project.save();
+      console.log('✅ Application rejected and saved');
+
+      // Create notification
+      await Notification.createNotification({
+        recipient: applicantId,
+        sender: req.user.id,
+        type: 'application_rejected',
+        title: 'Application Update',
+        message: `Your application was not accepted`,
+        link: `/projects`,
+        project: projectId,
+      });
+
+    } else {
+      return next(new AppError('Invalid action. Use "approve" or "reject"', 400));
+    }
+
+    // NOW fetch the updated project with full population
+    const updatedProject = await Project.findById(projectId)
+      .populate('owner', 'firstName lastName email avatar')
+      .populate('members.user', 'firstName lastName email avatar skills')
+      .populate('applicants.user', 'firstName lastName email avatar skills bio');
+
+    console.log('📤 Sending response. Members in response:', 
+      updatedProject.members.length,
+      updatedProject.members.map(m => ({ 
+        name: m.user?.firstName, 
+        role: m.role 
+      }))
+    );
+
+    res.status(200).json({
+      success: true,
+      message: `Application ${action === 'approve' ? 'approved' : 'rejected'} successfully`,
+      data: { project: updatedProject },
+    });
+
+  } catch (error) {
+    console.error('❌ Error in handleApplication:', error);
     next(error);
   }
 };

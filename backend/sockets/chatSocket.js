@@ -80,7 +80,7 @@ module.exports = (io) => {
         socket.emit('error', { message: 'Failed to join project' });
       }
     });
-
+    
     // Send message
     socket.on('send_message', async (data) => {
       try {

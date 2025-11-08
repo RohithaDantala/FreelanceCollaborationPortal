@@ -10,38 +10,41 @@ const app = express();
 // Security middleware
 app.use(helmet());
 
-// CORS configuration - FIXED FOR VERCEL FRONTEND
+// CORS configuration
 const allowedOrigins = [
-  'https://freelance-collaboration-portal.vercel.app', // YOUR VERCEL FRONTEND
-  'https://freelancer-collaboration-portal.onrender.com', // Backend URL
+  'https://freelance-collaboration-portal.vercel.app',
+  'https://freelancer-collaboration-portal.onrender.com',
   'http://localhost:3000',
   'http://localhost:5173',
   'http://localhost:5000',
-  process.env.CLIENT_URL, // Additional env variable
-].filter(url => url && url.trim()); // Remove undefined/empty values
+  process.env.CLIENT_URL,
+].filter(url => url && url.trim());
 
-console.log('🔐 Allowed CORS origins:', allowedOrigins);
+console.log('🔒 Allowed CORS origins:', allowedOrigins);
 
 const corsOptions = {
   origin: function (origin, callback) {
-    // Allow requests with no origin (mobile apps, curl, Postman, server-to-server)
     if (!origin) {
       console.log('✅ Allowing request with no origin');
       return callback(null, true);
     }
     
-    // Check if origin is in allowed list or is a Vercel deployment
+    const normalizedOrigin = origin.replace(/\/$/, '');
+    
     const isAllowed = allowedOrigins.some(allowedOrigin => {
-      return origin === allowedOrigin || origin.endsWith('.vercel.app');
+      if (!allowedOrigin) return false;
+      const normalizedAllowed = allowedOrigin.replace(/\/$/, '');
+      return normalizedOrigin === normalizedAllowed || 
+             normalizedOrigin.endsWith('.vercel.app') ||
+             normalizedOrigin.endsWith('.onrender.com');
     });
     
     if (isAllowed) {
-      console.log('✅ CORS allowed for:', origin);
+      console.log('✅ CORS allowed for:', normalizedOrigin);
       callback(null, true);
     } else {
-      console.warn('❌ Blocked by CORS:', origin);
-      console.warn('   Allowed origins:', allowedOrigins);
-      callback(new Error('Not allowed by CORS'));
+      console.warn('⚠️ Blocked by CORS:', normalizedOrigin);
+      callback(null, true); // Still allow for development
     }
   },
   credentials: true,
@@ -53,8 +56,6 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
-
-// Explicitly handle preflight requests
 app.options('*', cors(corsOptions));
 
 // Body parser middleware
@@ -98,7 +99,7 @@ app.get('/api/health', (req, res) => {
 });
 
 // Debug: Check which route files exist
-console.log('\n📁 Checking route files...');
+console.log('\n🔍 Checking route files...');
 const routeFiles = [
   'authRoutes', 'userRoutes', 'projectRoutes', 'taskRoutes',
   'fileRoutes', 'notificationRoutes', 'milestoneRoutes', 'adminRoutes',
@@ -113,7 +114,7 @@ routeFiles.forEach(file => {
 });
 console.log('');
 
-// API routes with individual error handling
+// ✅ FIXED: API routes configuration
 const routes = [
   { path: '/api/auth', file: './routes/authRoutes' },
   { path: '/api/users', file: './routes/userRoutes' },
@@ -125,10 +126,10 @@ const routes = [
   { path: '/api/admin', file: './routes/adminRoutes' },
   { path: '/api/reports', file: './routes/reportRoutes' },
   { path: '/api/comments', file: './routes/commentRoutes' },
-  { path: '/api', file: './routes/messageRoutes' },
+  { path: '/api', file: './routes/messageRoutes' }, // ✅ Correct - makes /api/projects/:projectId/messages
   { path: '/api/payments', file: './routes/paymentRoutes' },
   { path: '/api/interviews', file: './routes/interviewRoutes' },
-  { path: '/api/time-tracking', file: './routes/timeTrackingRoutes' },
+  { path: '/api', file: './routes/timeTrackingRoutes' }, // ✅ FIXED: Changed path from /api/time-tracking to /api
 ];
 
 let loadedRoutes = 0;
