@@ -51,7 +51,7 @@ try {
   app.use('/api/reports', require('./routes/reportRoutes'));
   app.use('/api/comments', require('./routes/commentRoutes'));
   app.use('/api', require('./routes/messageRoutes')); // Message routes
-  app.use('/api/payments', require('./routes/paymentRoutes')); // Payment routes
+  app.use('/api/payments', require('./routes/paymentRoutes'));
   app.use('/api/interviews', require('./routes/interviewRoutes')); // Interview routes
   
   // FIXED: Use only ONE time tracking route file

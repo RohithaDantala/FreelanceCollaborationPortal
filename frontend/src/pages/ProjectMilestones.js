@@ -5,7 +5,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { getProject } from '../redux/slices/projectSlice';
 import MilestoneTimeline from '../components/MilestoneTimeline';
 import ProgressDashboard from '../components/ProgressDashboard';
-
+import DailyProgressChart from '../components/DailyProgressChart';
 const ProjectMilestones = () => {
   const { id } = useParams();
   const dispatch = useDispatch();

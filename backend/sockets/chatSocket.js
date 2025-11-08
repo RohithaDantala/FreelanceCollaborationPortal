@@ -1,6 +1,7 @@
-// backend/sockets/chatSocket.js - FIXED VERSION
-const Message = require('../models/Message');
-const Project = require('../models/Project');
+// backend/sockets/chatSocket.js - FIXED PATHS
+const Message = require('../src/models/Message');
+const Project = require('../src/models/Project');
+const User = require('../src/models/User');
 const jwt = require('jsonwebtoken');
 
 module.exports = (io) => {
@@ -14,7 +15,7 @@ module.exports = (io) => {
       }
 
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      const user = await require('../models/User').findById(decoded.id).select('-password');
+      const user = await User.findById(decoded.id).select('-password');
       
       if (!user) {
         return next(new Error('User not found'));
@@ -29,7 +30,7 @@ module.exports = (io) => {
   });
 
   io.on('connection', (socket) => {
-    console.log(`User connected: ${socket.user.firstName} ${socket.user.lastName} (${socket.id})`);
+    console.log(`✅ User connected: ${socket.user.firstName} ${socket.user.lastName} (${socket.id})`);
 
     // Join project room
     socket.on('join_project', async (projectId) => {
@@ -52,7 +53,7 @@ module.exports = (io) => {
         }
 
         socket.join(`project_${projectId}`);
-        console.log(`${socket.user.firstName} joined project ${projectId}`);
+        console.log(`📥 ${socket.user.firstName} joined project ${projectId}`);
 
         // Get online users in this project room
         const socketsInRoom = await io.in(`project_${projectId}`).fetchSockets();
@@ -66,7 +67,7 @@ module.exports = (io) => {
         io.to(`project_${projectId}`).emit('online_users', onlineUsers);
 
         // Send recent messages to the newly joined user
-        const recentMessages = await Message.find({ project: projectId })
+        const recentMessages = await Message.find({ project: projectId, isDeleted: false })
           .sort({ createdAt: -1 })
           .limit(50)
           .populate('sender', 'firstName lastName avatar')
@@ -75,7 +76,7 @@ module.exports = (io) => {
         socket.emit('recent_messages', recentMessages.reverse());
 
       } catch (error) {
-        console.error('Join project error:', error);
+        console.error('❌ Join project error:', error);
         socket.emit('error', { message: 'Failed to join project' });
       }
     });
@@ -111,13 +112,16 @@ module.exports = (io) => {
             lastName: message.sender.lastName,
             avatar: message.sender.avatar
           },
-          createdAt: message.createdAt
+          createdAt: message.createdAt,
+          type: message.type,
+          isEdited: message.isEdited,
+          isDeleted: message.isDeleted
         });
 
-        console.log(`Message sent in project ${projectId} by ${socket.user.firstName}`);
+        console.log(`📤 Message sent in project ${projectId} by ${socket.user.firstName}`);
 
       } catch (error) {
-        console.error('Send message error:', error);
+        console.error('❌ Send message error:', error);
         socket.emit('error', { message: 'Failed to send message' });
       }
     });
@@ -139,7 +143,7 @@ module.exports = (io) => {
     // Leave project
     socket.on('leave_project', async (projectId) => {
       socket.leave(`project_${projectId}`);
-      console.log(`${socket.user.firstName} left project ${projectId}`);
+      console.log(`📤 ${socket.user.firstName} left project ${projectId}`);
 
       // Update online users
       const socketsInRoom = await io.in(`project_${projectId}`).fetchSockets();
@@ -154,7 +158,7 @@ module.exports = (io) => {
 
     // Disconnect
     socket.on('disconnect', async () => {
-      console.log(`User disconnected: ${socket.user.firstName} (${socket.id})`);
+      console.log(`🔌 User disconnected: ${socket.user.firstName} (${socket.id})`);
       
       // Update all rooms this user was in
       const rooms = Array.from(socket.rooms).filter(r => r.startsWith('project_'));

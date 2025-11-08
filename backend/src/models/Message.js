@@ -1,3 +1,4 @@
+// backend/models/Message.js
 const mongoose = require('mongoose');
 
 const messageSchema = new mongoose.Schema(
@@ -17,6 +18,7 @@ const messageSchema = new mongoose.Schema(
       type: String,
       required: [true, 'Message content is required'],
       maxlength: [2000, 'Message cannot exceed 2000 characters'],
+      trim: true,
     },
     type: {
       type: String,
@@ -70,14 +72,34 @@ const messageSchema = new mongoose.Schema(
   }
 );
 
+// Indexes for better query performance
 messageSchema.index({ project: 1, createdAt: -1 });
 messageSchema.index({ sender: 1 });
+messageSchema.index({ project: 1, isDeleted: 1 });
 
+// Method to mark message as read by a user
 messageSchema.methods.markAsRead = async function (userId) {
-  if (!this.readBy.some((r) => r.user.toString() === userId)) {
+  // Check if user already read this message
+  const alreadyRead = this.readBy.some(
+    (r) => r.user.toString() === userId.toString()
+  );
+  
+  if (!alreadyRead) {
     this.readBy.push({ user: userId, readAt: Date.now() });
     await this.save();
   }
+  return this;
 };
+
+// Virtual for checking if message is read by specific user
+messageSchema.virtual('isReadBy').get(function () {
+  return (userId) => {
+    return this.readBy.some((r) => r.user.toString() === userId.toString());
+  };
+});
+
+// Ensure virtuals are included in JSON
+messageSchema.set('toJSON', { virtuals: true });
+messageSchema.set('toObject', { virtuals: true });
 
 module.exports = mongoose.model('Message', messageSchema);

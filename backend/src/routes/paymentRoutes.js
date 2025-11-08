@@ -1,12 +1,10 @@
+// backend/src/routes/paymentRoutes.js - FIXED
 const express = require('express');
 const {
-  createPaymentIntent,
+  createPayment,           // FIXED: Changed from createPaymentIntent
   holdInEscrow,
   releasePayment,
-  requestRefund,
-  createDispute,
-  getProjectPayments,
-  getMyPayments,
+  getProjectPayments,      // FIXED: Added this
 } = require('../controllers/paymentController');
 const { protect } = require('../middleware/auth');
 
@@ -16,13 +14,13 @@ const router = express.Router();
 router.use(protect);
 
 // Payment operations
-router.post('/create-intent', createPaymentIntent);
+router.post('/create', createPayment);              // FIXED: Changed route and function
 router.post('/:id/escrow', holdInEscrow);
 router.post('/:id/release', releasePayment);
-router.post('/:id/refund', requestRefund);
-router.post('/:id/dispute', createDispute);
 
-// Get payments
-router.get('/my-payments', getMyPayments);
+// Get payments - FIXED: Added this route
+router.get('/project/:projectId', getProjectPayments);
 
 module.exports = router;
+
+// USAGE IN app.js should be

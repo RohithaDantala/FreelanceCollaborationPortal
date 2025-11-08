@@ -1,42 +1,161 @@
 // frontend/src/components/DailyProgressChart.js
-import React, { useEffect } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import { fetchSummary } from '../redux/slices/timeSlice';
+import React from 'react';
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  Area,
+  AreaChart
+} from 'recharts';
 
-const DailyProgressChart = ({ days = 14 }) => {
-  const dispatch = useDispatch();
-  const { summary } = useSelector((s) => s.time);
+const DailyProgressChart = ({ data, type = 'line' }) => {
+  // Format data for the chart
+  const formattedData = data?.map((item) => ({
+    date: new Date(item.date).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+    }),
+    progress: item.progress || 0,
+    completed: item.completed || 0,
+    total: item.total || 0,
+  })) || [];
 
-  useEffect(() => {
-    dispatch(fetchSummary(days));
-  }, [dispatch, days]);
+  // Custom tooltip
+  const CustomTooltip = ({ active, payload, label }) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="bg-white p-3 rounded-lg shadow-lg border border-gray-200">
+          <p className="font-semibold text-gray-800 mb-2">{label}</p>
+          {payload.map((entry, index) => (
+            <p key={index} className="text-sm" style={{ color: entry.color }}>
+              {entry.name}: {entry.value}
+              {entry.dataKey === 'progress' ? '%' : ''}
+            </p>
+          ))}
+        </div>
+      );
+    }
+    return null;
+  };
 
-  const bars = summary.perDay || [];
+  if (!data || data.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-64 bg-gray-50 rounded-lg">
+        <div className="text-center text-gray-500">
+          <svg
+            className="w-16 h-16 mx-auto mb-4 opacity-50"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+            />
+          </svg>
+          <p>No progress data available</p>
+        </div>
+      </div>
+    );
+  }
 
-  const max = Math.max(60, ...bars.map((b) => b.totalMinutes));
+  if (type === 'area') {
+    return (
+      <ResponsiveContainer width="100%" height={300}>
+        <AreaChart data={formattedData}>
+          <defs>
+            <linearGradient id="colorProgress" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8} />
+              <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+          <XAxis 
+            dataKey="date" 
+            stroke="#6b7280"
+            style={{ fontSize: '12px' }}
+          />
+          <YAxis 
+            stroke="#6b7280"
+            style={{ fontSize: '12px' }}
+            label={{ 
+              value: 'Progress (%)', 
+              angle: -90, 
+              position: 'insideLeft',
+              style: { fontSize: '12px', fill: '#6b7280' }
+            }}
+          />
+          <Tooltip content={<CustomTooltip />} />
+          <Legend 
+            wrapperStyle={{ fontSize: '12px' }}
+            iconType="circle"
+          />
+          <Area
+            type="monotone"
+            dataKey="progress"
+            stroke="#3b82f6"
+            strokeWidth={2}
+            fillOpacity={1}
+            fill="url(#colorProgress)"
+            name="Progress"
+          />
+        </AreaChart>
+      </ResponsiveContainer>
+    );
+  }
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-6">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-gray-800">Daily Progress</h3>
-        <span className="text-sm text-gray-500">Last {days} days</span>
-      </div>
-      <div className="grid grid-cols-14 gap-2">
-        {bars.map((b) => {
-          const height = Math.round((b.totalMinutes / max) * 120);
-          const hours = (b.totalMinutes / 60).toFixed(1);
-          return (
-            <div key={b._id} className="flex flex-col items-center">
-              <div className="w-6 bg-primary-500 rounded" style={{ height: `${height}px` }} title={`${hours}h`}></div>
-              <div className="text-[10px] text-gray-500 mt-1">{b._id.slice(5)}</div>
-            </div>
-          );
-        })}
-      </div>
-      {bars.length === 0 && (
-        <div className="text-sm text-gray-500">No time logged yet.</div>
-      )}
-    </div>
+    <ResponsiveContainer width="100%" height={300}>
+      <LineChart data={formattedData}>
+        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+        <XAxis 
+          dataKey="date" 
+          stroke="#6b7280"
+          style={{ fontSize: '12px' }}
+        />
+        <YAxis 
+          stroke="#6b7280"
+          style={{ fontSize: '12px' }}
+          label={{ 
+            value: 'Progress (%)', 
+            angle: -90, 
+            position: 'insideLeft',
+            style: { fontSize: '12px', fill: '#6b7280' }
+          }}
+        />
+        <Tooltip content={<CustomTooltip />} />
+        <Legend 
+          wrapperStyle={{ fontSize: '12px' }}
+          iconType="circle"
+        />
+        <Line
+          type="monotone"
+          dataKey="progress"
+          stroke="#3b82f6"
+          strokeWidth={3}
+          dot={{ fill: '#3b82f6', r: 5 }}
+          activeDot={{ r: 7 }}
+          name="Progress"
+        />
+        {formattedData.some(d => d.completed !== undefined) && (
+          <Line
+            type="monotone"
+            dataKey="completed"
+            stroke="#10b981"
+            strokeWidth={2}
+            dot={{ fill: '#10b981', r: 4 }}
+            name="Completed Tasks"
+          />
+        )}
+      </LineChart>
+    </ResponsiveContainer>
   );
 };
 

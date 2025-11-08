@@ -1,3 +1,4 @@
+// frontend/src/redux/store.js - UPDATED
 import { configureStore } from '@reduxjs/toolkit';
 import authReducer from './slices/authSlice';
 import projectReducer from './slices/projectSlice';
@@ -7,6 +8,8 @@ import notificationReducer from './slices/notificationSlice';
 import milestoneReducer from './slices/milestoneSlice';
 import timeReducer from './slices/timeSlice';
 import paymentReducer from './slices/paymentSlice';
+import messageReducer from './slices/messageSlice'; // ADDED
+
 const store = configureStore({
   reducer: {
     auth: authReducer,
@@ -17,7 +20,7 @@ const store = configureStore({
     milestones: milestoneReducer,
     time: timeReducer,
     payments: paymentReducer,
-
+    messages: messageReducer, // ADDED
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

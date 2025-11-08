@@ -1,78 +1,139 @@
+// frontend/src/components/ProjectChat.js - FIXED VERSION
 import React, { useState, useEffect, useRef } from 'react';
-import { useSelector } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import io from 'socket.io-client';
+import {
+  getProjectMessages,
+  addMessage,
+  updateMessage,
+  removeMessage,
+  clearMessages,
+} from '../redux/slices/messageSlice';
 
 const ProjectChat = ({ projectId }) => {
+  const dispatch = useDispatch();
   const { user } = useSelector((state) => state.auth);
-  const [messages, setMessages] = useState([]);
+  const { messages } = useSelector((state) => state.messages);
+  
   const [newMessage, setNewMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [typingUsers, setTypingUsers] = useState([]);
   const [socket, setSocket] = useState(null);
+  const [onlineUsers, setOnlineUsers] = useState([]);
+  const [isConnected, setIsConnected] = useState(false);
+  
   const messagesEndRef = useRef(null);
   const typingTimeoutRef = useRef(null);
+
+  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+  const SOCKET_URL = API_URL.replace('/api', '');
 
   // Initialize Socket.io
   useEffect(() => {
     const token = localStorage.getItem('token');
-    const newSocket = io('http://localhost:5000', {
+    
+    if (!token) {
+      console.error('No token found');
+      return;
+    }
+
+    const newSocket = io(SOCKET_URL, {
       auth: { token },
+      transports: ['websocket', 'polling'],
     });
 
-    setSocket(newSocket);
+    newSocket.on('connect', () => {
+      console.log('✅ Socket connected:', newSocket.id);
+      setIsConnected(true);
+      
+      // Join project room
+      newSocket.emit('join_project', projectId);
+    });
 
-    // Join project room
-    newSocket.emit('join_project', projectId);
+    newSocket.on('connect_error', (error) => {
+      console.error('❌ Socket connection error:', error);
+      setIsConnected(false);
+    });
+
+    newSocket.on('error', (error) => {
+      console.error('Socket error:', error);
+    });
+
+    // Listen for recent messages when joining
+    newSocket.on('recent_messages', (recentMessages) => {
+      console.log('📨 Received recent messages:', recentMessages.length);
+      dispatch(clearMessages());
+      recentMessages.forEach((msg) => dispatch(addMessage(msg)));
+    });
 
     // Listen for new messages
-    newSocket.on('receive_message', (message) => {
-      setMessages((prev) => [...prev, message]);
+    newSocket.on('new_message', (message) => {
+      console.log('📩 New message received:', message);
+      dispatch(addMessage(message));
     });
 
-    // Listen for typing
+    // Listen for message edits
+    newSocket.on('message_edited', (message) => {
+      console.log('✏️ Message edited:', message);
+      dispatch(updateMessage(message));
+    });
+
+    // Listen for message deletions
+    newSocket.on('message_deleted', ({ messageId }) => {
+      console.log('🗑️ Message deleted:', messageId);
+      dispatch(removeMessage(messageId));
+    });
+
+    // Listen for online users
+    newSocket.on('online_users', (users) => {
+      console.log('👥 Online users:', users);
+      setOnlineUsers(users);
+    });
+
+    // Listen for typing indicators
     newSocket.on('user_typing', (data) => {
       if (data.userId !== user.id) {
-        setTypingUsers((prev) => [...prev, data.userId]);
+        setTypingUsers((prev) => {
+          if (!prev.find((u) => u.userId === data.userId)) {
+            return [...prev, data];
+          }
+          return prev;
+        });
       }
     });
 
     newSocket.on('user_stop_typing', (data) => {
-      setTypingUsers((prev) => prev.filter((id) => id !== data.userId));
+      setTypingUsers((prev) => prev.filter((u) => u.userId !== data.userId));
     });
 
+    setSocket(newSocket);
+
     return () => {
+      console.log('🔌 Disconnecting socket');
       newSocket.emit('leave_project', projectId);
       newSocket.disconnect();
     };
-  }, [projectId, user.id]);
+  }, [projectId, user.id, SOCKET_URL, dispatch]);
+
+  // Fetch initial messages from API
+  useEffect(() => {
+    if (projectId) {
+      dispatch(getProjectMessages(projectId));
+    }
+    return () => {
+      dispatch(clearMessages());
+    };
+  }, [projectId, dispatch]);
 
   // Scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Fetch initial messages
-  useEffect(() => {
-    const fetchMessages = async () => {
-      try {
-        const response = await fetch(`http://localhost:5000/api/projects/${projectId}/messages`, {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
-          },
-        });
-        const data = await response.json();
-        setMessages(data.data.messages);
-      } catch (error) {
-        console.error('Failed to fetch messages:', error);
-      }
-    };
-    fetchMessages();
-  }, [projectId]);
-
   const handleTyping = () => {
-    if (!isTyping) {
+    if (!isTyping && socket) {
       setIsTyping(true);
-      socket?.emit('typing', { projectId });
+      socket.emit('typing', { projectId });
     }
 
     if (typingTimeoutRef.current) {
@@ -81,31 +142,28 @@ const ProjectChat = ({ projectId }) => {
 
     typingTimeoutRef.current = setTimeout(() => {
       setIsTyping(false);
-      socket?.emit('stop_typing', { projectId });
+      if (socket) {
+        socket.emit('stop_typing', { projectId });
+      }
     }, 1000);
   };
 
-  const handleSendMessage = async () => {
-    if (!newMessage.trim()) return;
+  const handleSendMessage = () => {
+    if (!newMessage.trim() || !socket) return;
 
-    try {
-      const response = await fetch(`http://localhost:5000/api/projects/${projectId}/messages`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
-        },
-        body: JSON.stringify({ content: newMessage }),
-      });
+    console.log('📤 Sending message:', newMessage);
 
-      if (response.ok) {
-        setNewMessage('');
-        setIsTyping(false);
-        socket?.emit('stop_typing', { projectId });
-      }
-    } catch (error) {
-      console.error('Failed to send message:', error);
+    socket.emit('send_message', {
+      projectId,
+      content: newMessage.trim(),
+    });
+
+    setNewMessage('');
+    setIsTyping(false);
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
     }
+    socket.emit('stop_typing', { projectId });
   };
 
   const handleKeyPress = (e) => {
@@ -122,76 +180,170 @@ const ProjectChat = ({ projectId }) => {
     });
   };
 
+  const formatDate = (date) => {
+    const messageDate = new Date(date);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    if (messageDate.toDateString() === today.toDateString()) {
+      return 'Today';
+    } else if (messageDate.toDateString() === yesterday.toDateString()) {
+      return 'Yesterday';
+    } else {
+      return messageDate.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+      });
+    }
+  };
+
+  // Group messages by date
+  const groupedMessages = messages.reduce((groups, message) => {
+    const date = formatDate(message.createdAt);
+    if (!groups[date]) {
+      groups[date] = [];
+    }
+    groups[date].push(message);
+    return groups;
+  }, {});
+
   return (
     <div className="flex flex-col h-[600px] bg-white rounded-lg shadow-lg">
       {/* Header */}
       <div className="bg-primary-600 text-white px-6 py-4 rounded-t-lg">
-        <h3 className="text-lg font-semibold">💬 Project Chat</h3>
-        <p className="text-sm text-primary-100">Real-time team communication</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-semibold">💬 Project Chat</h3>
+            <p className="text-sm text-primary-100">Real-time team communication</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <div
+              className={`w-3 h-3 rounded-full ${
+                isConnected ? 'bg-green-400' : 'bg-red-400'
+              }`}
+              title={isConnected ? 'Connected' : 'Disconnected'}
+            />
+            <span className="text-sm text-primary-100">
+              {onlineUsers.length} online
+            </span>
+          </div>
+        </div>
       </div>
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.length === 0 ? (
+        {Object.keys(groupedMessages).length === 0 ? (
           <div className="flex items-center justify-center h-full text-gray-400">
             <div className="text-center">
-              <svg className="w-16 h-16 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+              <svg
+                className="w-16 h-16 mx-auto mb-4 opacity-50"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+                />
               </svg>
               <p>No messages yet. Start the conversation!</p>
             </div>
           </div>
         ) : (
-          messages.map((message, index) => {
-            const isOwnMessage = message.userId === user.id || message.sender?._id === user.id;
-            const showAvatar = index === 0 || messages[index - 1].userId !== message.userId;
-
-            return (
-              <div
-                key={message._id || index}
-                className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'}`}
-              >
-                {!isOwnMessage && showAvatar && (
-                  <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center mr-2 flex-shrink-0">
-                    <span className="text-primary-600 text-xs font-semibold">
-                      {message.sender?.firstName?.charAt(0)}
-                      {message.sender?.lastName?.charAt(0)}
-                    </span>
-                  </div>
-                )}
-                {!isOwnMessage && !showAvatar && <div className="w-8 mr-2" />}
-
-                <div
-                  className={`max-w-[70%] ${
-                    isOwnMessage
-                      ? 'bg-primary-600 text-white'
-                      : 'bg-gray-100 text-gray-800'
-                  } rounded-lg px-4 py-2`}
-                >
-                  {!isOwnMessage && showAvatar && (
-                    <p className="text-xs font-semibold mb-1 opacity-75">
-                      {message.sender?.firstName} {message.sender?.lastName}
-                    </p>
-                  )}
-                  <p className="text-sm whitespace-pre-wrap break-words">{message.message || message.content}</p>
-                  <p className={`text-xs mt-1 ${isOwnMessage ? 'text-primary-100' : 'text-gray-500'}`}>
-                    {formatTime(message.timestamp || message.createdAt)}
-                  </p>
+          Object.entries(groupedMessages).map(([date, dateMessages]) => (
+            <div key={date}>
+              {/* Date Separator */}
+              <div className="flex items-center justify-center my-4">
+                <div className="bg-gray-200 text-gray-600 text-xs px-3 py-1 rounded-full">
+                  {date}
                 </div>
               </div>
-            );
-          })
+
+              {/* Messages for this date */}
+              {dateMessages.map((message, index) => {
+                const isOwnMessage =
+                  message.sender?._id === user.id || message.sender === user.id;
+                const showAvatar =
+                  index === 0 ||
+                  dateMessages[index - 1].sender?._id !== message.sender?._id;
+
+                return (
+                  <div
+                    key={message._id || index}
+                    className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'} mb-2`}
+                  >
+                    {!isOwnMessage && showAvatar && (
+                      <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center mr-2 flex-shrink-0">
+                        <span className="text-primary-600 text-xs font-semibold">
+                          {message.sender?.firstName?.charAt(0) || '?'}
+                          {message.sender?.lastName?.charAt(0) || ''}
+                        </span>
+                      </div>
+                    )}
+                    {!isOwnMessage && !showAvatar && <div className="w-8 mr-2" />}
+
+                    <div
+                      className={`max-w-[70%] ${
+                        isOwnMessage
+                          ? 'bg-primary-600 text-white'
+                          : 'bg-gray-100 text-gray-800'
+                      } rounded-lg px-4 py-2 shadow-sm`}
+                    >
+                      {!isOwnMessage && showAvatar && (
+                        <p className="text-xs font-semibold mb-1 opacity-75">
+                          {message.sender?.firstName} {message.sender?.lastName}
+                        </p>
+                      )}
+                      <p className="text-sm whitespace-pre-wrap break-words">
+                        {message.content}
+                      </p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <p
+                          className={`text-xs ${
+                            isOwnMessage ? 'text-primary-100' : 'text-gray-500'
+                          }`}
+                        >
+                          {formatTime(message.createdAt)}
+                        </p>
+                        {message.isEdited && (
+                          <span
+                            className={`text-xs italic ${
+                              isOwnMessage ? 'text-primary-200' : 'text-gray-400'
+                            }`}
+                          >
+                            (edited)
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ))
         )}
 
         {/* Typing Indicator */}
         {typingUsers.length > 0 && (
-          <div className="flex items-center text-gray-500 text-sm italic">
+          <div className="flex items-center text-gray-500 text-sm italic pl-10">
             <div className="flex space-x-1 mr-2">
-              <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-              <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-              <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+              <div
+                className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+                style={{ animationDelay: '0ms' }}
+              ></div>
+              <div
+                className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+                style={{ animationDelay: '150ms' }}
+              ></div>
+              <div
+                className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+                style={{ animationDelay: '300ms' }}
+              ></div>
             </div>
-            Someone is typing...
+            {typingUsers[0]?.userName || 'Someone'} is typing...
           </div>
         )}
 
@@ -199,7 +351,13 @@ const ProjectChat = ({ projectId }) => {
       </div>
 
       {/* Input */}
-      <div className="border-t p-4">
+      <div className="border-t p-4 bg-gray-50 rounded-b-lg">
+        {!isConnected && (
+          <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 text-sm px-3 py-2 rounded-lg mb-3 flex items-center gap-2">
+            <span>⚠️</span>
+            <span>Reconnecting to chat...</span>
+          </div>
+        )}
         <div className="flex gap-2">
           <input
             type="text"
@@ -210,16 +368,23 @@ const ProjectChat = ({ projectId }) => {
             }}
             onKeyPress={handleKeyPress}
             placeholder="Type your message... (Press Enter to send)"
-            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            disabled={!isConnected}
+            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
           />
           <button
             onClick={handleSendMessage}
-            disabled={!newMessage.trim()}
-            className="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            disabled={!newMessage.trim() || !isConnected}
+            className="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
+              />
             </svg>
+            <span className="hidden sm:inline">Send</span>
           </button>
         </div>
       </div>
