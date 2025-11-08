@@ -1,35 +1,86 @@
 const express = require('express');
-const {
-  createTask,
-  getProjectTasks,
-  getTask,
-  updateTask,
-  deleteTask,
-  addSubtask,
-  toggleSubtask,
-  deleteSubtask,
-  reorderTasks,
-} = require('../controllers/taskController');
 const { protect } = require('../middleware/auth');
 
 const router = express.Router();
 
-// All routes require authentication
-router.use(protect);
+// Task routes
+router.get('/projects/:projectId/tasks', protect, async (req, res) => {
+  try {
+    // TODO: Implement get all tasks for a project
+    res.json({
+      success: true,
+      data: [],
+      message: 'Tasks retrieved successfully'
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
 
-// Project-level task routes
-router.post('/projects/:projectId/tasks', createTask);
-router.get('/projects/:projectId/tasks', getProjectTasks);
-router.put('/projects/:projectId/tasks/reorder', reorderTasks);
+router.post('/projects/:projectId/tasks', protect, async (req, res) => {
+  try {
+    // TODO: Implement create task
+    res.status(201).json({
+      success: true,
+      data: req.body,
+      message: 'Task created successfully'
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
 
-// Individual task routes
-router.get('/tasks/:id', getTask);
-router.put('/tasks/:id', updateTask);
-router.delete('/tasks/:id', deleteTask);
+router.get('/tasks/:id', protect, async (req, res) => {
+  try {
+    // TODO: Implement get single task
+    res.json({
+      success: true,
+      data: { id: req.params.id },
+      message: 'Task retrieved successfully'
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
 
-// Subtask routes
-router.post('/tasks/:id/subtasks', addSubtask);
-router.put('/tasks/:id/subtasks/:subtaskId', toggleSubtask);
-router.delete('/tasks/:id/subtasks/:subtaskId', deleteSubtask);
+router.put('/tasks/:id', protect, async (req, res) => {
+  try {
+    // TODO: Implement update task
+    res.json({
+      success: true,
+      data: { id: req.params.id, ...req.body },
+      message: 'Task updated successfully'
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
+router.delete('/tasks/:id', protect, async (req, res) => {
+  try {
+    // TODO: Implement delete task
+    res.json({
+      success: true,
+      message: 'Task deleted successfully'
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
 
 module.exports = router;

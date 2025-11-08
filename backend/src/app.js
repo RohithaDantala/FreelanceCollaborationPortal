@@ -1,6 +1,8 @@
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
+const fs = require('fs');
+const path = require('path');
 const { errorHandler, notFound } = require('./middleware/errorHandler');
 
 const app = express();
@@ -8,20 +10,29 @@ const app = express();
 // Security middleware
 app.use(helmet());
 
-// CORS configuration
-
+// CORS configuration with proper logging
 const allowedOrigins = [
-  (process.env.CLIENT_URL || '').trim(), // deployed frontend
-  'http://localhost:3000',               // local dev
-].filter(Boolean); // remove any empty strings
+  process.env.CLIENT_URL, // Your frontend URL
+  'https://freelancer-collaboration-portal.onrender.com', // Backend URL
+  'http://localhost:3000',
+  'http://localhost:5173',
+  'http://localhost:5000',
+].filter(url => url && url.trim()); // Remove undefined/empty values
+
+console.log('🔐 Allowed CORS origins:', allowedOrigins);
 
 const corsOptions = {
   origin: function (origin, callback) {
-    // allow requests with no origin (like Postman or server-to-server)
-    if (!origin || allowedOrigins.includes(origin)) {
+    // Allow requests with no origin (mobile apps, curl, Postman, server-to-server)
+    if (!origin) {
+      return callback(null, true);
+    }
+    
+    if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
-      console.warn('Blocked by CORS:', origin);
+      console.warn('❌ Blocked by CORS:', origin);
+      console.warn('   Allowed origins:', allowedOrigins);
       callback(new Error('Not allowed by CORS'));
     }
   },
@@ -30,8 +41,6 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
-
-
 
 // Body parser middleware
 app.use(express.json({ limit: '10mb' }));
@@ -45,6 +54,23 @@ if (process.env.NODE_ENV === 'development') {
   });
 }
 
+// Root route handler
+app.get('/', (req, res) => {
+  res.json({
+    success: true,
+    message: 'Freelancer Collaboration Portal API',
+    version: '1.0.0',
+    status: 'running',
+    endpoints: {
+      health: '/api/health',
+      auth: '/api/auth',
+      projects: '/api/projects',
+      users: '/api/users',
+      notifications: '/api/notifications'
+    }
+  });
+});
+
 // Health check route
 app.get('/api/health', (req, res) => {
   res.status(200).json({
@@ -55,31 +81,60 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// API routes
-try {
-  app.use('/api/auth', require('./routes/authRoutes'));
-  app.use('/api/users', require('./routes/userRoutes'));
-  app.use('/api/projects', require('./routes/projectRoutes'));
-  app.use('/api', require('./routes/taskRoutes')); // Task routes
-  app.use('/api', require('./routes/fileRoutes')); // File routes
-  app.use('/api/notifications', require('./routes/notificationRoutes'));
-  app.use('/api', require('./routes/milestoneRoutes'));
-  app.use('/api/admin', require('./routes/adminRoutes'));
-  app.use('/api/reports', require('./routes/reportRoutes'));
-  app.use('/api/comments', require('./routes/commentRoutes'));
-  app.use('/api', require('./routes/messageRoutes')); // Message routes
-  app.use('/api/payments', require('./routes/paymentRoutes'));
-  app.use('/api/interviews', require('./routes/interviewRoutes')); // Interview routes
-  
-  // FIXED: Use only ONE time tracking route file
-  app.use('/api/time-tracking', require('./routes/timeTrackingRoutes'));
-  
-} catch (error) {
-  console.warn('⚠️ Some routes not found — create them under src/routes/');
-}
+// Debug: Check which route files exist
+console.log('\n📁 Checking route files...');
+const routeFiles = [
+  'authRoutes', 'userRoutes', 'projectRoutes', 'taskRoutes',
+  'fileRoutes', 'notificationRoutes', 'milestoneRoutes', 'adminRoutes',
+  'reportRoutes', 'commentRoutes', 'messageRoutes', 'paymentRoutes',
+  'interviewRoutes', 'timeTrackingRoutes'
+];
+
+routeFiles.forEach(file => {
+  const filePath = path.join(__dirname, 'routes', `${file}.js`);
+  const exists = fs.existsSync(filePath);
+  console.log(`${exists ? '✅' : '❌'} ${file}.js`);
+});
+console.log('');
+
+// API routes with individual error handling
+const routes = [
+  { path: '/api/auth', file: './routes/authRoutes' },
+  { path: '/api/users', file: './routes/userRoutes' },
+  { path: '/api/projects', file: './routes/projectRoutes' },
+  { path: '/api/notifications', file: './routes/notificationRoutes' },
+  { path: '/api', file: './routes/taskRoutes' },
+  { path: '/api', file: './routes/fileRoutes' },
+  { path: '/api', file: './routes/milestoneRoutes' },
+  { path: '/api/admin', file: './routes/adminRoutes' },
+  { path: '/api/reports', file: './routes/reportRoutes' },
+  { path: '/api/comments', file: './routes/commentRoutes' },
+  { path: '/api', file: './routes/messageRoutes' },
+  { path: '/api/payments', file: './routes/paymentRoutes' },
+  { path: '/api/interviews', file: './routes/interviewRoutes' },
+  { path: '/api/time-tracking', file: './routes/timeTrackingRoutes' },
+];
+
+let loadedRoutes = 0;
+let failedRoutes = 0;
+
+routes.forEach(({ path, file }) => {
+  try {
+    const route = require(file);
+    app.use(path, route);
+    console.log(`✅ Loaded route: ${file} -> ${path}`);
+    loadedRoutes++;
+  } catch (error) {
+    console.error(`❌ Failed to load route ${file}:`, error.message);
+    failedRoutes++;
+  }
+});
+
+console.log(`\n📊 Route loading summary: ${loadedRoutes} loaded, ${failedRoutes} failed\n`);
 
 // 404 handler - must be after all routes
 app.use(notFound);
+
 // Error handler - must be last
 app.use(errorHandler);
 
