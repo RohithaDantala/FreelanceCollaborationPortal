@@ -6,7 +6,7 @@ import fileReducer from './slices/fileSlice';
 import notificationReducer from './slices/notificationSlice';
 import milestoneReducer from './slices/milestoneSlice';
 import timeReducer from './slices/timeSlice';
-
+import paymentReducer from './slices/paymentSlice';
 const store = configureStore({
   reducer: {
     auth: authReducer,
@@ -16,6 +16,7 @@ const store = configureStore({
     notifications: notificationReducer,
     milestones: milestoneReducer,
     time: timeReducer,
+    payments: paymentReducer,
 
   },
   middleware: (getDefaultMiddleware) =>
