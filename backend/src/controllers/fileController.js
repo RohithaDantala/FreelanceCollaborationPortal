@@ -1,12 +1,11 @@
-// backend/src/controllers/fileController.js - WITH NOTIFICATIONS
+// backend/src/controllers/fileController.js - NO NOTIFICATIONS
 const File = require('../models/File');
 const Project = require('../models/Project');
 const { AppError } = require('../middleware/errorHandler');
-const cloudinary = require('../config/cloudinary');
-const { createAndEmitNotification } = require('../utils/notificationHelper');
+const cloudinary = require('cloudinary').v2;
 
 // @desc    Upload file
-// @route   POST /api/files/upload
+// @route   POST /api/projects/:projectId/files
 // @access  Private (Project members)
 exports.uploadFile = async (req, res, next) => {
   try {
@@ -14,10 +13,11 @@ exports.uploadFile = async (req, res, next) => {
       return next(new AppError('Please upload a file', 400));
     }
 
-    const { project, description, type, visibility } = req.body;
+    const { projectId } = req.params;
+    const { description, category, tags } = req.body;
 
     // Verify project and membership
-    const projectDoc = await Project.findById(project);
+    const projectDoc = await Project.findById(projectId);
     if (!projectDoc) {
       return next(new AppError('Project not found', 404));
     }
@@ -34,7 +34,7 @@ exports.uploadFile = async (req, res, next) => {
     const result = await new Promise((resolve, reject) => {
       const uploadStream = cloudinary.uploader.upload_stream(
         {
-          folder: `projects/${project}`,
+          folder: `projects/${projectId}`,
           resource_type: 'auto',
         },
         (error, result) => {
@@ -45,51 +45,33 @@ exports.uploadFile = async (req, res, next) => {
       uploadStream.end(req.file.buffer);
     });
 
+    // Determine file type
+    const getFileType = (mimetype) => {
+      if (mimetype.startsWith('image/')) return 'image';
+      if (mimetype.startsWith('video/')) return 'video';
+      if (mimetype.startsWith('audio/')) return 'audio';
+      if (mimetype.includes('pdf') || mimetype.includes('document')) return 'document';
+      if (mimetype.includes('zip') || mimetype.includes('rar')) return 'archive';
+      if (mimetype.includes('javascript') || mimetype.includes('json')) return 'code';
+      return 'other';
+    };
+
     // Create file record
     const file = await File.create({
-      filename: req.file.originalname,
-      url: result.secure_url,
-      cloudinaryId: result.public_id,
-      size: req.file.size,
-      mimetype: req.file.mimetype,
+      filename: result.public_id,
+      originalName: req.file.originalname,
+      fileUrl: result.secure_url,
+      fileType: getFileType(req.file.mimetype),
+      mimeType: req.file.mimetype,
+      fileSize: req.file.size,
       uploadedBy: req.user.id,
-      project,
+      project: projectId,
       description: description || '',
-      type: type || 'document',
-      visibility: visibility || 'team',
+      category: category || 'general',
+      tags: tags ? tags.split(',').map(t => t.trim()) : [],
     });
 
     await file.populate('uploadedBy', 'firstName lastName avatar');
-
-    // 🔔 Notify project owner (if uploader is not the owner)
-    if (projectDoc.owner.toString() !== req.user.id) {
-      await createAndEmitNotification({
-        recipient: projectDoc.owner,
-        sender: req.user.id,
-        type: 'file_uploaded',
-        title: 'New File Uploaded',
-        message: `${req.user.firstName} ${req.user.lastName} uploaded "${req.file.originalname}" to ${projectDoc.title}`,
-        link: `/projects/${project}/files`,
-        project: project,
-      });
-    }
-
-    // 🔔 Notify all project members (except uploader and owner)
-    const membersToNotify = projectDoc.members
-      .map(m => m.user.toString())
-      .filter(userId => userId !== req.user.id && userId !== projectDoc.owner.toString());
-
-    for (const memberId of membersToNotify) {
-      await createAndEmitNotification({
-        recipient: memberId,
-        sender: req.user.id,
-        type: 'file_uploaded',
-        title: 'New File Available',
-        message: `${req.user.firstName} uploaded "${req.file.originalname}"`,
-        link: `/projects/${project}/files`,
-        project: project,
-      });
-    }
 
     res.status(201).json({
       success: true,
@@ -101,7 +83,7 @@ exports.uploadFile = async (req, res, next) => {
   }
 };
 
-// @desc    Update file (mark as deliverable reviewed, etc.)
+// @desc    Update file
 // @route   PUT /api/files/:id
 // @access  Private (Project members)
 exports.updateFile = async (req, res, next) => {
@@ -121,53 +103,19 @@ exports.updateFile = async (req, res, next) => {
       return next(new AppError('Not authorized', 403));
     }
 
-    const { description, type, visibility, deliverableStatus } = req.body;
-
-    const oldStatus = file.deliverableStatus;
+    const { description, category, tags, deliverableStatus } = req.body;
 
     if (description !== undefined) file.description = description;
-    if (type) file.type = type;
-    if (visibility) file.visibility = visibility;
-    if (deliverableStatus) file.deliverableStatus = deliverableStatus;
+    if (category) file.category = category;
+    if (tags) file.tags = tags;
+    if (deliverableStatus) {
+      file.deliverableStatus = deliverableStatus;
+      file.reviewedBy = req.user.id;
+      file.reviewedAt = Date.now();
+    }
 
     await file.save();
     await file.populate('uploadedBy', 'firstName lastName avatar');
-
-    // 🔔 NOTIFICATION: Deliverable submitted
-    if (type === 'deliverable' && file.deliverableStatus === 'submitted' && oldStatus !== 'submitted') {
-      if (project.owner.toString() !== req.user.id) {
-        await createAndEmitNotification({
-          recipient: project.owner,
-          sender: req.user.id,
-          type: 'deliverable_submitted',
-          title: 'Deliverable Submitted',
-          message: `${req.user.firstName} ${req.user.lastName} submitted a deliverable: "${file.filename}"`,
-          link: `/projects/${file.project}/files`,
-          project: file.project,
-        });
-      }
-    }
-
-    // 🔔 NOTIFICATION: Deliverable reviewed
-    if (deliverableStatus && deliverableStatus !== oldStatus && ['approved', 'rejected', 'needs_revision'].includes(deliverableStatus)) {
-      const statusMessages = {
-        approved: 'approved',
-        rejected: 'rejected',
-        needs_revision: 'requested revisions for'
-      };
-
-      if (file.uploadedBy.toString() !== req.user.id) {
-        await createAndEmitNotification({
-          recipient: file.uploadedBy,
-          sender: req.user.id,
-          type: 'deliverable_reviewed',
-          title: `Deliverable ${deliverableStatus === 'approved' ? 'Approved!' : deliverableStatus === 'rejected' ? 'Rejected' : 'Needs Revision'}`,
-          message: `${req.user.firstName} ${statusMessages[deliverableStatus]} your deliverable "${file.filename}"`,
-          link: `/projects/${file.project}/files`,
-          project: file.project,
-        });
-      }
-    }
 
     res.status(200).json({
       success: true,
@@ -199,8 +147,8 @@ exports.deleteFile = async (req, res, next) => {
     }
 
     // Delete from Cloudinary
-    if (file.cloudinaryId) {
-      await cloudinary.uploader.destroy(file.cloudinaryId, {
+    if (file.filename) {
+      await cloudinary.uploader.destroy(file.filename, {
         resource_type: 'auto',
       });
     }
@@ -217,12 +165,12 @@ exports.deleteFile = async (req, res, next) => {
 };
 
 // @desc    Get project files
-// @route   GET /api/files/project/:projectId
+// @route   GET /api/projects/:projectId/files
 // @access  Private (Project members)
 exports.getProjectFiles = async (req, res, next) => {
   try {
     const { projectId } = req.params;
-    const { type, visibility } = req.query;
+    const { category, deliverableStatus } = req.query;
 
     const project = await Project.findById(projectId);
     if (!project) {
@@ -237,12 +185,13 @@ exports.getProjectFiles = async (req, res, next) => {
       return next(new AppError('Not authorized', 403));
     }
 
-    const query = { project: projectId };
-    if (type) query.type = type;
-    if (visibility) query.visibility = visibility;
+    const query = { project: projectId, isActive: true };
+    if (category) query.category = category;
+    if (deliverableStatus) query.deliverableStatus = deliverableStatus;
 
     const files = await File.find(query)
       .populate('uploadedBy', 'firstName lastName avatar')
+      .populate('reviewedBy', 'firstName lastName')
       .sort({ createdAt: -1 });
 
     res.status(200).json({
@@ -262,10 +211,9 @@ exports.getProjectFiles = async (req, res, next) => {
 // @access  Private (Project members)
 exports.getFile = async (req, res, next) => {
   try {
-    const file = await File.findById(req.params.id).populate(
-      'uploadedBy',
-      'firstName lastName avatar'
-    );
+    const file = await File.findById(req.params.id)
+      .populate('uploadedBy', 'firstName lastName avatar')
+      .populate('reviewedBy', 'firstName lastName');
 
     if (!file) {
       return next(new AppError('File not found', 404));

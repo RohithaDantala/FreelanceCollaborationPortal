@@ -1,27 +1,26 @@
-// backend/src/controllers/taskController.js - WITH NOTIFICATIONS
+// backend/src/controllers/taskController.js - COMPLETE FIXED VERSION
 const Task = require('../models/Task');
 const Project = require('../models/Project');
 const { AppError } = require('../middleware/errorHandler');
-const { createAndEmitNotification } = require('../utils/notificationHelper');
 
 // @desc    Create task
-// @route   POST /api/tasks
+// @route   POST /api/projects/:projectId/tasks
 // @access  Private (Project members)
 exports.createTask = async (req, res, next) => {
   try {
+    const { projectId } = req.params;
     const {
       title,
       description,
-      project,
-      assignedTo,
+      assignee,
       priority,
       deadline,
-      tags,
+      labels,
       status,
     } = req.body;
 
     // Verify project exists and user is a member
-    const projectDoc = await Project.findById(project);
+    const projectDoc = await Project.findById(projectId);
     if (!projectDoc) {
       return next(new AppError('Project not found', 404));
     }
@@ -37,33 +36,19 @@ exports.createTask = async (req, res, next) => {
     const task = await Task.create({
       title,
       description,
-      project,
-      assignedTo,
-      assignedBy: req.user.id,
+      project: projectId,
+      assignee: assignee || null,
+      createdBy: req.user.id,
       priority: priority || 'medium',
-      deadline,
-      tags,
+      deadline: deadline || null,
+      labels: labels || [],
       status: status || 'todo',
     });
 
     await task.populate([
-      { path: 'assignedTo', select: 'firstName lastName email avatar' },
-      { path: 'assignedBy', select: 'firstName lastName email avatar' },
+      { path: 'assignee', select: 'firstName lastName email avatar' },
+      { path: 'createdBy', select: 'firstName lastName email avatar' },
     ]);
-
-    // 🔔 Send notification to assigned user
-    if (assignedTo && assignedTo !== req.user.id) {
-      await createAndEmitNotification({
-        recipient: assignedTo,
-        sender: req.user.id,
-        type: 'task_assigned',
-        title: 'New Task Assigned',
-        message: `${req.user.firstName} ${req.user.lastName} assigned you a task: "${title}"`,
-        link: `/projects/${project}/tasks`,
-        project: project,
-        task: task._id,
-      });
-    }
 
     res.status(201).json({
       success: true,
@@ -71,6 +56,7 @@ exports.createTask = async (req, res, next) => {
       data: { task },
     });
   } catch (error) {
+    console.error('Create task error:', error);
     next(error);
   }
 };
@@ -87,6 +73,10 @@ exports.updateTask = async (req, res, next) => {
     }
 
     const project = await Project.findById(task.project);
+    if (!project) {
+      return next(new AppError('Project not found', 404));
+    }
+
     const isMember =
       project.members.some((m) => m.user.toString() === req.user.id) ||
       project.owner.toString() === req.user.id;
@@ -95,86 +85,31 @@ exports.updateTask = async (req, res, next) => {
       return next(new AppError('Not authorized', 403));
     }
 
-    const oldStatus = task.status;
-    const oldAssignedTo = task.assignedTo?.toString();
-
     const {
       title,
       description,
-      assignedTo,
+      assignee,
       priority,
       deadline,
-      tags,
+      labels,
       status,
     } = req.body;
 
     // Update task fields
-    if (title) task.title = title;
-    if (description) task.description = description;
-    if (assignedTo !== undefined) task.assignedTo = assignedTo;
-    if (priority) task.priority = priority;
-    if (deadline) task.deadline = deadline;
-    if (tags) task.tags = tags;
-    if (status) task.status = status;
+    if (title !== undefined) task.title = title;
+    if (description !== undefined) task.description = description;
+    if (assignee !== undefined) task.assignee = assignee;
+    if (priority !== undefined) task.priority = priority;
+    if (deadline !== undefined) task.deadline = deadline;
+    if (labels !== undefined) task.labels = labels;
+    if (status !== undefined) task.status = status;
 
     await task.save();
     await task.populate([
-      { path: 'assignedTo', select: 'firstName lastName email avatar' },
-      { path: 'assignedBy', select: 'firstName lastName email avatar' },
+      { path: 'assignee', select: 'firstName lastName email avatar' },
+      { path: 'createdBy', select: 'firstName lastName email avatar' },
       { path: 'project', select: 'title' },
     ]);
-
-    // 🔔 NOTIFICATION: Status changed
-    if (status && status !== oldStatus) {
-      const statusMessages = {
-        todo: 'moved to To Do',
-        in_progress: 'started working on',
-        review: 'submitted for review',
-        done: 'completed',
-      };
-
-      // Notify project owner
-      if (project.owner.toString() !== req.user.id) {
-        await createAndEmitNotification({
-          recipient: project.owner,
-          sender: req.user.id,
-          type: status === 'done' ? 'task_completed' : 'task_updated',
-          title: status === 'done' ? 'Task Completed!' : 'Task Status Updated',
-          message: `${req.user.firstName} ${req.user.lastName} ${statusMessages[status]} "${task.title}"`,
-          link: `/projects/${task.project._id}/tasks`,
-          project: task.project._id,
-          task: task._id,
-        });
-      }
-
-      // Notify assigned user if they didn't make the change
-      if (task.assignedTo && task.assignedTo._id.toString() !== req.user.id) {
-        await createAndEmitNotification({
-          recipient: task.assignedTo._id,
-          sender: req.user.id,
-          type: 'task_updated',
-          title: 'Task Status Changed',
-          message: `${req.user.firstName} changed the status of "${task.title}" to ${status.replace('_', ' ')}`,
-          link: `/projects/${task.project._id}/tasks`,
-          project: task.project._id,
-          task: task._id,
-        });
-      }
-    }
-
-    // 🔔 NOTIFICATION: Task reassigned
-    if (assignedTo && oldAssignedTo !== assignedTo) {
-      await createAndEmitNotification({
-        recipient: assignedTo,
-        sender: req.user.id,
-        type: 'task_assigned',
-        title: 'Task Assigned to You',
-        message: `${req.user.firstName} ${req.user.lastName} assigned you "${task.title}"`,
-        link: `/projects/${task.project._id}/tasks`,
-        project: task.project._id,
-        task: task._id,
-      });
-    }
 
     res.status(200).json({
       success: true,
@@ -182,6 +117,7 @@ exports.updateTask = async (req, res, next) => {
       data: { task },
     });
   } catch (error) {
+    console.error('Update task error:', error);
     next(error);
   }
 };
@@ -198,8 +134,12 @@ exports.deleteTask = async (req, res, next) => {
     }
 
     const project = await Project.findById(task.project);
+    if (!project) {
+      return next(new AppError('Project not found', 404));
+    }
+
     const isOwner = project.owner.toString() === req.user.id;
-    const isCreator = task.assignedBy.toString() === req.user.id;
+    const isCreator = task.createdBy.toString() === req.user.id;
 
     if (!isOwner && !isCreator) {
       return next(new AppError('Not authorized', 403));
@@ -212,20 +152,24 @@ exports.deleteTask = async (req, res, next) => {
       message: 'Task deleted successfully',
     });
   } catch (error) {
+    console.error('Delete task error:', error);
     next(error);
   }
 };
 
 // @desc    Get project tasks
-// @route   GET /api/tasks/project/:projectId
+// @route   GET /api/projects/:projectId/tasks
 // @access  Private (Project members)
 exports.getProjectTasks = async (req, res, next) => {
   try {
     const { projectId } = req.params;
-    const { status, assignedTo, priority } = req.query;
+    const { status, assignee, priority } = req.query;
+
+    console.log('📋 Fetching tasks for project:', projectId);
 
     const project = await Project.findById(projectId);
     if (!project) {
+      console.error('❌ Project not found:', projectId);
       return next(new AppError('Project not found', 404));
     }
 
@@ -234,18 +178,24 @@ exports.getProjectTasks = async (req, res, next) => {
       project.owner.toString() === req.user.id;
 
     if (!isMember) {
+      console.error('❌ User not authorized:', req.user.id);
       return next(new AppError('Not authorized', 403));
     }
 
     const query = { project: projectId };
     if (status) query.status = status;
-    if (assignedTo) query.assignedTo = assignedTo;
+    if (assignee) query.assignee = assignee;
     if (priority) query.priority = priority;
 
+    console.log('🔍 Task query:', query);
+
     const tasks = await Task.find(query)
-      .populate('assignedTo', 'firstName lastName email avatar')
-      .populate('assignedBy', 'firstName lastName email avatar')
-      .sort({ createdAt: -1 });
+      .populate('assignee', 'firstName lastName email avatar')
+      .populate('createdBy', 'firstName lastName email avatar')
+      .sort({ createdAt: -1 })
+      .lean(); // Use lean() for better performance
+
+    console.log('✅ Found tasks:', tasks.length);
 
     // Group tasks by status
     const groupedTasks = {
@@ -264,6 +214,7 @@ exports.getProjectTasks = async (req, res, next) => {
       },
     });
   } catch (error) {
+    console.error('❌ Get project tasks error:', error);
     next(error);
   }
 };
@@ -274,8 +225,8 @@ exports.getProjectTasks = async (req, res, next) => {
 exports.getTask = async (req, res, next) => {
   try {
     const task = await Task.findById(req.params.id)
-      .populate('assignedTo', 'firstName lastName email avatar')
-      .populate('assignedBy', 'firstName lastName email avatar')
+      .populate('assignee', 'firstName lastName email avatar')
+      .populate('createdBy', 'firstName lastName email avatar')
       .populate('project', 'title');
 
     if (!task) {
@@ -283,6 +234,10 @@ exports.getTask = async (req, res, next) => {
     }
 
     const project = await Project.findById(task.project._id);
+    if (!project) {
+      return next(new AppError('Project not found', 404));
+    }
+
     const isMember =
       project.members.some((m) => m.user.toString() === req.user.id) ||
       project.owner.toString() === req.user.id;
@@ -296,6 +251,7 @@ exports.getTask = async (req, res, next) => {
       data: { task },
     });
   } catch (error) {
+    console.error('Get task error:', error);
     next(error);
   }
 };

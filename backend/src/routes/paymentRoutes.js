@@ -15,8 +15,8 @@ const router = express.Router();
 // All routes require authentication
 router.use(protect);
 
-// Payment operations
-router.post('/create', createPayment);
+// ✅ FIX: Changed from /create to just / for POST
+router.post('/', createPayment);
 router.put('/:id/status', updatePaymentStatus);
 
 // Get payments

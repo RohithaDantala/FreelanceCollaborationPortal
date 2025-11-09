@@ -1,10 +1,18 @@
-import React from 'react';
+// frontend/src/App.js - FIXED VERSION
+import React, { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-
+import { useSelector, useDispatch } from 'react-redux';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+
 import Header from './components/layout/Header';
 import Footer from './components/layout/Footer';
+import NotificationToast from './components/NotificationToast';
+import WelcomeModal from './components/WelcomeModal';
+
+// Socket services
+import { initializeNotificationSocket, disconnectNotificationSocket } from './services/notificationSocket';
+import { getUnreadCount } from './redux/slices/notificationSlice';
 
 // Page components
 import Register from './pages/Register';
@@ -27,6 +35,52 @@ import OwnerRoute from './components/OwnerRoute';
 import AdminRoute from './components/AdminRoute';
 
 function App() {
+  const dispatch = useDispatch();
+  const { user, token } = useSelector((state) => state.auth);
+  const [notifications, setNotifications] = useState([]);
+  const [showWelcome, setShowWelcome] = useState(false);
+
+  // Initialize notification socket when user logs in
+  useEffect(() => {
+    if (user && token) {
+      // Show welcome modal on login (only once per session)
+      const hasShownWelcome = sessionStorage.getItem('welcomeShown');
+      if (!hasShownWelcome) {
+        setShowWelcome(true);
+        sessionStorage.setItem('welcomeShown', 'true');
+      }
+
+      // Initialize notification socket
+      const handleNewNotification = (notification) => {
+        console.log('📬 New notification received:', notification);
+        
+        // Update unread count
+        dispatch(getUnreadCount());
+        
+        // Add to toast notifications
+        setNotifications((prev) => [...prev, { ...notification, id: Date.now() }]);
+      };
+
+      const socket = initializeNotificationSocket(token, handleNewNotification);
+
+      // Fetch initial unread count
+      dispatch(getUnreadCount());
+
+      // Cleanup on logout
+      return () => {
+        disconnectNotificationSocket();
+      };
+    } else {
+      // Clear session storage on logout
+      sessionStorage.removeItem('welcomeShown');
+    }
+  }, [user, token, dispatch]);
+
+  // Remove notification from toast list
+  const removeNotification = (id) => {
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
+  };
+
   return (
     <Router>
       <div className="flex flex-col min-h-screen bg-gray-50">
@@ -109,7 +163,7 @@ function App() {
             <Route path="/projects" element={<BrowseProjects />} />
             <Route path="/projects/:id" element={<ProjectDetail />} />
 
-            {/* Protected routes - Require login */}
+            {/* Protected routes */}
             <Route 
               path="/dashboard" 
               element={
@@ -119,7 +173,6 @@ function App() {
               } 
             />
             
-            {/* Owner-only route - Require project_owner or admin role */}
             <Route 
               path="/projects/create" 
               element={
@@ -173,18 +226,18 @@ function App() {
                 </PrivateRoute>
               } 
             />
-            <Route
-                path="/projects/:id/payments"
-                element={
-                  <PrivateRoute>
-                    <ProjectMemberRoute>
-                      <ProjectPayments />
-                    </ProjectMemberRoute>
-                  </PrivateRoute>
-                }
-              />
 
-            {/* NEW: Reports Route */}
+            <Route
+              path="/projects/:id/payments"
+              element={
+                <PrivateRoute>
+                  <ProjectMemberRoute>
+                    <ProjectPayments />
+                  </ProjectMemberRoute>
+                </PrivateRoute>
+              }
+            />
+
             <Route 
               path="/projects/:id/reports" 
               element={
@@ -241,7 +294,8 @@ function App() {
         </main>
         
         <Footer />
-        {/* ADD THIS LINE */}
+        
+        {/* Toast Container for general toasts */}
         <ToastContainer
           position="top-right"
           autoClose={3000}
@@ -253,6 +307,25 @@ function App() {
           draggable
           pauseOnHover
         />
+
+        {/* Real-time Notification Toasts */}
+        <div className="fixed top-20 right-4 z-[9999] space-y-2">
+          {notifications.map((notification) => (
+            <NotificationToast
+              key={notification.id}
+              notification={notification}
+              onClose={() => removeNotification(notification.id)}
+            />
+          ))}
+        </div>
+
+        {/* Welcome Modal */}
+        {showWelcome && user && (
+          <WelcomeModal
+            user={user}
+            onClose={() => setShowWelcome(false)}
+          />
+        )}
       </div>
     </Router>
   );

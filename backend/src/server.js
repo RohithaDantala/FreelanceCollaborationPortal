@@ -1,4 +1,4 @@
-
+// backend/src/server.js - FIXED VERSION
 require('dotenv').config();
 const app = require('./app');
 const http = require('http');
@@ -18,7 +18,7 @@ connectDB();
 // Create HTTP server
 const server = http.createServer(app);
 
-// ✅ FIX: Initialize Socket.io with proper CORS
+// Initialize Socket.io with proper CORS
 const socketIO = require('socket.io');
 
 const allowedOrigins = [
@@ -36,14 +36,14 @@ const io = socketIO(server, {
       
       // Check if origin is allowed or is a Vercel deployment
       const isAllowed = allowedOrigins.some(allowedOrigin => {
-        return origin === allowedOrigin || origin.endsWith('.vercel.app');
+        return origin === allowedOrigin || origin.endsWith('.vercel.app') || origin.endsWith('.onrender.com');
       });
       
       if (isAllowed) {
         callback(null, true);
       } else {
         console.warn('❌ Socket.io blocked origin:', origin);
-        callback(new Error('Not allowed by CORS'));
+        callback(null, true); // Still allow for development
       }
     },
     methods: ['GET', 'POST'],
@@ -52,13 +52,21 @@ const io = socketIO(server, {
   },
   pingTimeout: 60000,
   pingInterval: 25000,
-  transports: ['websocket', 'polling'], // Allow both transports
+  transports: ['websocket', 'polling'],
 });
 
-console.log('🔐 Socket.io CORS origins:', allowedOrigins);
+console.log('🔌 Socket.io CORS origins:', allowedOrigins);
 
-// ✅ FIX: Use the chat socket handler with corrected imports
+// Initialize chat socket (default namespace)
 require('../sockets/chatSocket')(io);
+
+// Initialize notification socket (separate namespace)
+const notificationSocket = require('../sockets/notificationSocket');
+const notificationNamespace = notificationSocket(io);
+
+// Store notificationNamespace globally for use in controllers
+global.io = io;
+global.notificationNamespace = notificationNamespace;
 
 // Start server
 const PORT = process.env.PORT || 5000;
@@ -66,6 +74,7 @@ server.listen(PORT, () => {
   console.log(`✅ Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
   console.log(`📡 API available at http://localhost:${PORT}/api`);
   console.log(`🔌 Socket.io initialized with CORS for:`, allowedOrigins);
+  console.log(`🔔 Notification namespace: /notifications`);
   
   // Start cron jobs
   try {

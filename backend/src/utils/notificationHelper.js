@@ -1,4 +1,4 @@
-// backend/src/utils/notificationHelper.js - FIXED VERSION
+// backend/src/utils/notificationHelper.js - NEW FILE
 const Notification = require('../models/Notification');
 
 /**
@@ -26,7 +26,7 @@ const createAndEmitNotification = async (notificationData) => {
     // Populate sender info for real-time notification
     await notification.populate('sender', 'firstName lastName avatar');
 
-    console.log('🔔 Created notification:', {
+    console.log('📧 Created notification:', {
       id: notification._id,
       recipient: notification.recipient,
       type: notification.type,
@@ -57,7 +57,7 @@ const createAndEmitNotification = async (notificationData) => {
 
       console.log(`✅ Notification emitted to room: ${userRoom}`);
     } else {
-      console.warn('⚠️ Notification namespace not available');
+      console.warn('⚠️  Notification namespace not available');
     }
 
     return notification;

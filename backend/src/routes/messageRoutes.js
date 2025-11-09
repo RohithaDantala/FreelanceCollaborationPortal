@@ -1,4 +1,4 @@
-// backend/src/routes/messageRoutes.js
+// backend/src/routes/messageRoutes.js - FIXED
 const express = require('express');
 const {
   getProjectMessages,
@@ -13,8 +13,9 @@ const router = express.Router();
 
 router.use(protect);
 
-// IMPORTANT: More specific routes MUST come before general routes
-router.get('/projects/:projectId/messages/unread', getUnreadCount); // ✅ Specific route first
+// ✅ FIX: Correct route paths - these get mounted at /api in app.js
+// So these become /api/projects/:projectId/messages
+router.get('/projects/:projectId/messages/unread', getUnreadCount);
 router.get('/projects/:projectId/messages', getProjectMessages);
 router.post('/projects/:projectId/messages', sendMessage);
 router.put('/messages/:id', editMessage);

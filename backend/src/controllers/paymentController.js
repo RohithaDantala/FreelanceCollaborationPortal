@@ -1,11 +1,10 @@
-// backend/src/controllers/paymentController.js - WITH NOTIFICATIONS
+// backend/src/controllers/paymentController.js - NO NOTIFICATIONS
 const Payment = require('../models/Payment');
 const Project = require('../models/Project');
 const { AppError } = require('../middleware/errorHandler');
-const { createAndEmitNotification } = require('../utils/notificationHelper');
 
 // @desc    Create payment
-// @route   POST /api/payments
+// @route   POST /api/payments/create
 // @access  Private (Project owner)
 exports.createPayment = async (req, res, next) => {
   try {
@@ -57,17 +56,6 @@ exports.createPayment = async (req, res, next) => {
       { path: 'milestone', select: 'title' },
     ]);
 
-    // 🔔 Notify recipient about new payment
-    await createAndEmitNotification({
-      recipient: recipient,
-      sender: req.user.id,
-      type: 'payment_created',
-      title: 'New Payment Created',
-      message: `${req.user.firstName} ${req.user.lastName} created a payment of ${currency || 'USD'} ${amount} for you`,
-      link: `/projects/${project}/payments`,
-      project: project,
-    });
-
     res.status(201).json({
       success: true,
       message: 'Payment created successfully',
@@ -97,8 +85,6 @@ exports.updatePaymentStatus = async (req, res, next) => {
     if (!isOwner && !isRecipient) {
       return next(new AppError('Not authorized', 403));
     }
-
-    const oldStatus = payment.status;
 
     // Validate status transitions
     const validTransitions = {
@@ -131,89 +117,6 @@ exports.updatePaymentStatus = async (req, res, next) => {
       { path: 'recipient', select: 'firstName lastName email' },
       { path: 'project', select: 'title' },
     ]);
-
-    // 🔔 NOTIFICATION: Payment escrowed
-    if (status === 'escrowed' && oldStatus !== 'escrowed') {
-      await createAndEmitNotification({
-        recipient: payment.recipient,
-        sender: req.user.id,
-        type: 'payment_escrowed',
-        title: 'Payment Secured',
-        message: `Your payment of ${payment.currency} ${payment.amount} has been secured in escrow`,
-        link: `/projects/${payment.project._id}/payments`,
-        project: payment.project._id,
-      });
-    }
-
-    // 🔔 NOTIFICATION: Payment released
-    if (status === 'released' && oldStatus !== 'released') {
-      await createAndEmitNotification({
-        recipient: payment.recipient,
-        sender: req.user.id,
-        type: 'payment_released',
-        title: '💰 Payment Released!',
-        message: `Your payment of ${payment.currency} ${payment.amount} has been released!`,
-        link: `/projects/${payment.project._id}/payments`,
-        project: payment.project._id,
-      });
-
-      // Also notify payer
-      if (payment.payer.toString() !== req.user.id) {
-        await createAndEmitNotification({
-          recipient: payment.payer,
-          sender: req.user.id,
-          type: 'payment_released',
-          title: 'Payment Released',
-          message: `Payment of ${payment.currency} ${payment.amount} has been released to ${payment.recipient.firstName}`,
-          link: `/projects/${payment.project._id}/payments`,
-          project: payment.project._id,
-        });
-      }
-    }
-
-    // 🔔 NOTIFICATION: Payment refunded
-    if (status === 'refunded' && oldStatus !== 'refunded') {
-      await createAndEmitNotification({
-        recipient: payment.payer,
-        sender: req.user.id,
-        type: 'payment_refunded',
-        title: 'Payment Refunded',
-        message: `Payment of ${payment.currency} ${payment.amount} has been refunded`,
-        link: `/projects/${payment.project._id}/payments`,
-        project: payment.project._id,
-      });
-    }
-
-    // 🔔 NOTIFICATION: Payment disputed
-    if (status === 'disputed' && oldStatus !== 'disputed') {
-      // Notify both parties
-      const recipientId = payment.recipient.toString();
-      const payerId = payment.payer.toString();
-
-      if (recipientId !== req.user.id) {
-        await createAndEmitNotification({
-          recipient: recipientId,
-          sender: req.user.id,
-          type: 'payment_disputed',
-          title: '⚠️ Payment Disputed',
-          message: `Payment of ${payment.currency} ${payment.amount} has been disputed`,
-          link: `/projects/${payment.project._id}/payments`,
-          project: payment.project._id,
-        });
-      }
-
-      if (payerId !== req.user.id) {
-        await createAndEmitNotification({
-          recipient: payerId,
-          sender: req.user.id,
-          type: 'payment_disputed',
-          title: '⚠️ Payment Disputed',
-          message: `Payment of ${payment.currency} ${payment.amount} has been disputed`,
-          link: `/projects/${payment.project._id}/payments`,
-          project: payment.project._id,
-        });
-      }
-    }
 
     res.status(200).json({
       success: true,

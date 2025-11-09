@@ -1,97 +1,80 @@
-// frontend/src/services/notificationSocket.js - FIXED VERSION
-import { io } from 'socket.io-client';
+// backend/sockets/notificationSocket.js - FIXED VERSION
+const User = require('../src/models/User');
+const jwt = require('jsonwebtoken');
 
-const SOCKET_URL = process.env.REACT_APP_SOCKET_URL || 'https://freelancer-collaboration-portal.onrender.com';
+module.exports = (io) => {
+  // Create a separate namespace for notifications
+  const notificationNamespace = io.of('/notifications');
 
-let notificationSocket = null;
-
-export const initializeNotificationSocket = (token, onNotification) => {
-  if (!token) {
-    console.error('❌ Cannot initialize notification socket without token');
-    return null;
-  }
-
-  if (notificationSocket?.connected) {
-    console.log('✅ Notification socket already connected');
-    return notificationSocket;
-  }
-
-  console.log('🔔 Connecting to notification socket:', `${SOCKET_URL}/notifications`);
-
-  // Connect to the /notifications namespace
-  notificationSocket = io(`${SOCKET_URL}/notifications`, {
-    auth: { token },
-    transports: ['websocket', 'polling'],
-    reconnection: true,
-    reconnectionDelay: 1000,
-    reconnectionDelayMax: 5000,
-    reconnectionAttempts: 5,
-    timeout: 20000,
-  });
-
-  notificationSocket.on('connect', () => {
-    console.log('✅ Notification socket connected:', notificationSocket.id);
-  });
-
-  notificationSocket.on('new_notification', (notification) => {
-    console.log('🔔 New notification received:', notification);
-    if (onNotification) {
-      onNotification(notification);
-    }
-
-    // Also play a sound (optional)
+  // Authentication middleware
+  notificationNamespace.use(async (socket, next) => {
     try {
-      const audio = new Audio('/notification.mp3');
-      audio.volume = 0.3;
-      audio.play().catch(e => console.log('Could not play notification sound'));
-    } catch (e) {
-      // Ignore sound errors
+      const token = socket.handshake.auth.token;
+      
+      if (!token) {
+        return next(new Error('Authentication error'));
+      }
+
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const user = await User.findById(decoded.id).select('-password');
+      
+      if (!user) {
+        return next(new Error('User not found'));
+      }
+
+      socket.user = user;
+      next();
+    } catch (error) {
+      console.error('Notification socket auth error:', error);
+      next(new Error('Authentication error'));
     }
   });
 
-  notificationSocket.on('connect_error', (error) => {
-    console.error('❌ Notification socket connection error:', error.message);
+  notificationNamespace.on('connection', (socket) => {
+    console.log(`🔔 Notification socket connected: ${socket.user.firstName} (${socket.id})`);
+
+    // Join personal room for notifications
+    const userRoom = `user_${socket.user.id}`;
+    socket.join(userRoom);
+    console.log(`✅ User ${socket.user.firstName} joined notification room: ${userRoom}`);
+
+    socket.on('disconnect', () => {
+      console.log(`🔌 Notification socket disconnected: ${socket.user.firstName} (${socket.id})`);
+    });
   });
 
-  notificationSocket.on('disconnect', (reason) => {
-    console.log('🔌 Notification socket disconnected:', reason);
-    
-    // Auto-reconnect if disconnected unexpectedly
-    if (reason === 'io server disconnect') {
-      // Server initiated disconnect, try to reconnect
-      notificationSocket.connect();
-    }
-  });
-
-  notificationSocket.on('error', (error) => {
-    console.error('❌ Notification socket error:', error);
-  });
-
-  notificationSocket.on('reconnect', (attemptNumber) => {
-    console.log(`🔄 Notification socket reconnected after ${attemptNumber} attempts`);
-  });
-
-  notificationSocket.on('reconnect_attempt', (attemptNumber) => {
-    console.log(`🔄 Attempting to reconnect... (attempt ${attemptNumber})`);
-  });
-
-  notificationSocket.on('reconnect_error', (error) => {
-    console.error('❌ Reconnection error:', error.message);
-  });
-
-  notificationSocket.on('reconnect_failed', () => {
-    console.error('❌ Failed to reconnect notification socket');
-  });
-
-  return notificationSocket;
+  // Return the namespace for use in other parts of the app
+  return notificationNamespace;
 };
 
-export const disconnectNotificationSocket = () => {
-  if (notificationSocket) {
-    console.log('🔌 Disconnecting notification socket');
-    notificationSocket.disconnect();
-    notificationSocket = null;
+// Helper function to emit notifications to specific user
+module.exports.emitNotificationToUser = (io, userId, notification) => {
+  try {
+    const notificationNamespace = io.of('/notifications');
+    const userRoom = `user_${userId}`;
+    
+    console.log(`📤 Emitting notification to user ${userId} in room ${userRoom}`);
+    console.log('📧 Notification content:', {
+      type: notification.type,
+      title: notification.title,
+      message: notification.message
+    });
+
+    notificationNamespace.to(userRoom).emit('new_notification', {
+      _id: notification._id,
+      type: notification.type,
+      title: notification.title,
+      message: notification.message,
+      link: notification.link,
+      sender: notification.sender,
+      project: notification.project,
+      task: notification.task,
+      createdAt: notification.createdAt,
+      isRead: notification.isRead
+    });
+
+    console.log('✅ Notification emitted successfully');
+  } catch (error) {
+    console.error('❌ Error emitting notification:', error);
   }
 };
-
-export const getNotificationSocket = () => notificationSocket;

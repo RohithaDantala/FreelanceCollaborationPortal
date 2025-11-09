@@ -1,339 +1,231 @@
-// backend/src/controllers/timeTrackingController.js - FIXED
-const TimeEntry = require('../models/TimeTracking'); // Use TimeTracking model
+// backend/src/controllers/taskController.js - NO NOTIFICATIONS
+const Task = require('../models/Task');
 const Project = require('../models/Project');
-const mongoose = require('mongoose');
+const { AppError } = require('../middleware/errorHandler');
 
-// Start a new timer
-exports.startTimer = async (req, res) => {
+// @desc    Create task
+// @route   POST /api/projects/:projectId/tasks
+// @access  Private (Project members)
+exports.createTask = async (req, res, next) => {
   try {
-    const { projectId, taskId, description, workType } = req.body;
-
-    // Check if there's already a running timer for this user
-    const runningEntry = await TimeEntry.findOne({
-      user: req.user.id,
-      endTime: null
-    });
-
-    if (runningEntry) {
-      return res.status(400).json({ 
-        message: 'You already have a running timer. Please stop it first.',
-        runningEntry 
-      });
-    }
-
-    // Verify project access if projectId is provided
-    if (projectId) {
-      const project = await Project.findById(projectId);
-      if (!project) {
-        return res.status(404).json({ message: 'Project not found' });
-      }
-
-      // Check if user is part of the project
-      const isMember = project.members.some(
-        member => member.user.toString() === req.user.id
-      );
-      
-      if (!isMember && project.owner.toString() !== req.user.id) {
-        return res.status(403).json({ message: 'Access denied to this project' });
-      }
-    }
-
-    // Create new time entry
-    const timeEntry = new TimeEntry({
-      user: req.user.id,
-      project: projectId,
-      task: taskId,
+    const { projectId } = req.params;
+    const {
+      title,
       description,
-      workType: workType || 'development',
-      startTime: new Date(),
-      endTime: null,
-      status: 'active'
+      assignee,
+      priority,
+      deadline,
+      labels,
+      status,
+    } = req.body;
+
+    // Verify project exists and user is a member
+    const projectDoc = await Project.findById(projectId);
+    if (!projectDoc) {
+      return next(new AppError('Project not found', 404));
+    }
+
+    const isMember =
+      projectDoc.members.some((m) => m.user.toString() === req.user.id) ||
+      projectDoc.owner.toString() === req.user.id;
+
+    if (!isMember) {
+      return next(new AppError('Not a project member', 403));
+    }
+
+    const task = await Task.create({
+      title,
+      description,
+      project: projectId,
+      assignee,
+      createdBy: req.user.id,
+      priority: priority || 'medium',
+      deadline,
+      labels,
+      status: status || 'todo',
     });
 
-    await timeEntry.save();
-
-    const populatedEntry = await TimeEntry.findById(timeEntry._id)
-      .populate('project', 'title')
-      .populate('user', 'firstName lastName email');
+    await task.populate([
+      { path: 'assignee', select: 'firstName lastName email avatar' },
+      { path: 'createdBy', select: 'firstName lastName email avatar' },
+    ]);
 
     res.status(201).json({
       success: true,
-      message: 'Timer started successfully',
-      timeEntry: populatedEntry
+      message: 'Task created successfully',
+      data: { task },
     });
   } catch (error) {
-    console.error('Start timer error:', error);
-    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+    next(error);
   }
 };
 
-// Stop a running timer
-exports.stopTimer = async (req, res) => {
+// @desc    Update task
+// @route   PUT /api/tasks/:id
+// @access  Private (Project members)
+exports.updateTask = async (req, res, next) => {
   try {
-    const { entryId } = req.params;
-    let timeEntry;
+    const task = await Task.findById(req.params.id);
 
-    if (entryId) {
-      // Stop specific entry by ID
-      timeEntry = await TimeEntry.findOne({
-        _id: entryId,
-        user: req.user.id,
-        endTime: null
-      });
-    } else {
-      // Stop the currently running timer
-      timeEntry = await TimeEntry.findOne({
-        user: req.user.id,
-        endTime: null
-      });
+    if (!task) {
+      return next(new AppError('Task not found', 404));
     }
 
-    if (!timeEntry) {
-      return res.status(404).json({ success: false, message: 'No running timer found' });
+    const project = await Project.findById(task.project);
+    const isMember =
+      project.members.some((m) => m.user.toString() === req.user.id) ||
+      project.owner.toString() === req.user.id;
+
+    if (!isMember) {
+      return next(new AppError('Not authorized', 403));
     }
 
-    timeEntry.endTime = new Date();
-    timeEntry.status = 'completed';
-    
-    // Duration is calculated in the pre-save hook
-    await timeEntry.save();
-
-    const populatedEntry = await TimeEntry.findById(timeEntry._id)
-      .populate('project', 'title')
-      .populate('user', 'firstName lastName email');
-
-    res.json({
-      success: true,
-      message: 'Timer stopped successfully',
-      timeEntry: populatedEntry,
-      duration: timeEntry.duration
-    });
-  } catch (error) {
-    console.error('Stop timer error:', error);
-    res.status(500).json({ success: false, message: 'Server error', error: error.message });
-  }
-};
-
-// Get currently running timer
-exports.getRunning = async (req, res) => {
-  try {
-    const runningEntry = await TimeEntry.findOne({
-      user: req.user.id,
-      endTime: null
-    })
-      .populate('project', 'title')
-      .populate('user', 'firstName lastName email');
-
-    if (!runningEntry) {
-      return res.json({ 
-        success: true,
-        running: false, 
-        timeEntry: null 
-      });
-    }
-
-    res.json({
-      success: true,
-      running: true,
-      timeEntry: runningEntry
-    });
-  } catch (error) {
-    console.error('Get running timer error:', error);
-    res.status(500).json({ success: false, message: 'Server error', error: error.message });
-  }
-};
-
-// Create a manual time entry
-exports.createEntry = async (req, res) => {
-  try {
-    const { projectId, taskId, description, startTime, endTime, workType } = req.body;
-
-    if (!startTime || !endTime) {
-      return res.status(400).json({ 
-        success: false,
-        message: 'Start time and end time are required for manual entries' 
-      });
-    }
-
-    // Verify project access if projectId is provided
-    if (projectId) {
-      const project = await Project.findById(projectId);
-      if (!project) {
-        return res.status(404).json({ success: false, message: 'Project not found' });
-      }
-
-      const isMember = project.members.some(
-        member => member.user.toString() === req.user.id
-      );
-      
-      if (!isMember && project.owner.toString() !== req.user.id) {
-        return res.status(403).json({ success: false, message: 'Access denied to this project' });
-      }
-    }
-
-    const start = new Date(startTime);
-    const end = new Date(endTime);
-    
-    if (end <= start) {
-      return res.status(400).json({ success: false, message: 'End time must be after start time' });
-    }
-
-    const timeEntry = new TimeEntry({
-      user: req.user.id,
-      project: projectId,
-      task: taskId,
+    const {
+      title,
       description,
-      workType: workType || 'development',
-      startTime: start,
-      endTime: end,
-      status: 'completed'
-    });
+      assignee,
+      priority,
+      deadline,
+      labels,
+      status,
+    } = req.body;
 
-    await timeEntry.save();
+    // Update task fields
+    if (title) task.title = title;
+    if (description) task.description = description;
+    if (assignee !== undefined) task.assignee = assignee;
+    if (priority) task.priority = priority;
+    if (deadline) task.deadline = deadline;
+    if (labels) task.labels = labels;
+    if (status) task.status = status;
 
-    const populatedEntry = await TimeEntry.findById(timeEntry._id)
-      .populate('project', 'title')
-      .populate('user', 'firstName lastName email');
+    await task.save();
+    await task.populate([
+      { path: 'assignee', select: 'firstName lastName email avatar' },
+      { path: 'createdBy', select: 'firstName lastName email avatar' },
+      { path: 'project', select: 'title' },
+    ]);
 
-    res.status(201).json({
+    res.status(200).json({
       success: true,
-      message: 'Time entry created successfully',
-      timeEntry: populatedEntry
+      message: 'Task updated successfully',
+      data: { task },
     });
   } catch (error) {
-    console.error('Create entry error:', error);
-    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+    next(error);
   }
 };
 
-// Get user's time entries with filters
-exports.getMyEntries = async (req, res) => {
+// @desc    Delete task
+// @route   DELETE /api/tasks/:id
+// @access  Private (Task creator or project owner)
+exports.deleteTask = async (req, res, next) => {
   try {
-    const { projectId, startDate, endDate, page = 1, limit = 50 } = req.query;
+    const task = await Task.findById(req.params.id);
 
-    const query = { user: req.user.id };
-
-    if (projectId) {
-      query.project = projectId;
+    if (!task) {
+      return next(new AppError('Task not found', 404));
     }
 
-    if (startDate || endDate) {
-      query.startTime = {};
-      if (startDate) {
-        query.startTime.$gte = new Date(startDate);
-      }
-      if (endDate) {
-        query.startTime.$lte = new Date(endDate);
-      }
+    const project = await Project.findById(task.project);
+    const isOwner = project.owner.toString() === req.user.id;
+    const isCreator = task.createdBy.toString() === req.user.id;
+
+    if (!isOwner && !isCreator) {
+      return next(new AppError('Not authorized', 403));
     }
 
-    const skip = (parseInt(page) - 1) * parseInt(limit);
+    await task.deleteOne();
 
-    const [entries, total] = await Promise.all([
-      TimeEntry.find(query)
-        .populate('project', 'title')
-        .populate('user', 'firstName lastName email')
-        .sort({ startTime: -1 })
-        .skip(skip)
-        .limit(parseInt(limit)),
-      TimeEntry.countDocuments(query)
-    ]);
-
-    res.json({
+    res.status(200).json({
       success: true,
-      entries,
-      pagination: {
-        total,
-        page: parseInt(page),
-        pages: Math.ceil(total / parseInt(limit)),
-        limit: parseInt(limit)
-      }
+      message: 'Task deleted successfully',
     });
   } catch (error) {
-    console.error('Get entries error:', error);
-    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+    next(error);
   }
 };
 
-// Get time tracking summary/statistics
-exports.getSummary = async (req, res) => {
+// @desc    Get project tasks
+// @route   GET /api/projects/:projectId/tasks
+// @access  Private (Project members)
+exports.getProjectTasks = async (req, res, next) => {
   try {
-    const { projectId, startDate, endDate } = req.query;
+    const { projectId } = req.params;
+    const { status, assignee, priority } = req.query;
 
-    const matchQuery = { 
-      user: req.user.id,
-      endTime: { $ne: null } // Only completed entries
-    };
-
-    if (projectId) {
-      matchQuery.project = mongoose.Types.ObjectId(projectId);
+    const project = await Project.findById(projectId);
+    if (!project) {
+      return next(new AppError('Project not found', 404));
     }
 
-    if (startDate || endDate) {
-      matchQuery.startTime = {};
-      if (startDate) {
-        matchQuery.startTime.$gte = new Date(startDate);
-      }
-      if (endDate) {
-        matchQuery.startTime.$lte = new Date(endDate);
-      }
+    const isMember =
+      project.members.some((m) => m.user.toString() === req.user.id) ||
+      project.owner.toString() === req.user.id;
+
+    if (!isMember) {
+      return next(new AppError('Not authorized', 403));
     }
 
-    // Get total time
-    const totalResult = await TimeEntry.aggregate([
-      { $match: matchQuery },
-      {
-        $group: {
-          _id: null,
-          totalMinutes: { $sum: '$duration' },
-          totalEntries: { $sum: 1 }
-        }
-      }
-    ]);
+    const query = { project: projectId };
+    if (status) query.status = status;
+    if (assignee) query.assignee = assignee;
+    if (priority) query.priority = priority;
 
-    // Get time by project
-    const byProject = await TimeEntry.aggregate([
-      { $match: matchQuery },
-      {
-        $group: {
-          _id: '$project',
-          totalMinutes: { $sum: '$duration' },
-          entries: { $sum: 1 }
-        }
-      },
-      {
-        $lookup: {
-          from: 'projects',
-          localField: '_id',
-          foreignField: '_id',
-          as: 'project'
-        }
-      },
-      { $unwind: { path: '$project', preserveNullAndEmptyArrays: true } },
-      {
-        $project: {
-          projectId: '$_id',
-          projectTitle: '$project.title',
-          totalMinutes: 1,
-          entries: 1,
-          hours: { $divide: ['$totalMinutes', 60] }
-        }
-      }
-    ]);
+    const tasks = await Task.find(query)
+      .populate('assignee', 'firstName lastName email avatar')
+      .populate('createdBy', 'firstName lastName email avatar')
+      .sort({ createdAt: -1 });
 
-    const summary = {
-      total: totalResult[0] || { totalMinutes: 0, totalEntries: 0 },
-      totalHours: totalResult[0] ? (totalResult[0].totalMinutes / 60).toFixed(2) : 0,
-      byProject,
-      period: {
-        startDate: startDate || 'all',
-        endDate: endDate || 'all'
-      }
+    // Group tasks by status
+    const groupedTasks = {
+      todo: tasks.filter((t) => t.status === 'todo'),
+      in_progress: tasks.filter((t) => t.status === 'in_progress'),
+      review: tasks.filter((t) => t.status === 'review'),
+      done: tasks.filter((t) => t.status === 'done'),
     };
 
-    res.json({ success: true, ...summary });
+    res.status(200).json({
+      success: true,
+      data: {
+        tasks,
+        groupedTasks,
+        count: tasks.length,
+      },
+    });
   } catch (error) {
-    console.error('Get summary error:', error);
-    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+    next(error);
+  }
+};
+
+// @desc    Get single task
+// @route   GET /api/tasks/:id
+// @access  Private (Project members)
+exports.getTask = async (req, res, next) => {
+  try {
+    const task = await Task.findById(req.params.id)
+      .populate('assignee', 'firstName lastName email avatar')
+      .populate('createdBy', 'firstName lastName email avatar')
+      .populate('project', 'title');
+
+    if (!task) {
+      return next(new AppError('Task not found', 404));
+    }
+
+    const project = await Project.findById(task.project._id);
+    const isMember =
+      project.members.some((m) => m.user.toString() === req.user.id) ||
+      project.owner.toString() === req.user.id;
+
+    if (!isMember) {
+      return next(new AppError('Not authorized', 403));
+    }
+
+    res.status(200).json({
+      success: true,
+      data: { task },
+    });
+  } catch (error) {
+    next(error);
   }
 };

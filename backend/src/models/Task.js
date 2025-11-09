@@ -1,3 +1,4 @@
+// backend/src/models/Task.js - FIXED
 const mongoose = require('mongoose');
 
 const taskSchema = new mongoose.Schema(
@@ -17,6 +18,7 @@ const taskSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Project',
       required: true,
+      index: true,
     },
     assignee: {
       type: mongoose.Schema.Types.ObjectId,
@@ -32,6 +34,7 @@ const taskSchema = new mongoose.Schema(
       type: String,
       enum: ['todo', 'in_progress', 'review', 'done'],
       default: 'todo',
+      index: true,
     },
     priority: {
       type: String,
@@ -98,10 +101,11 @@ const taskSchema = new mongoose.Schema(
   }
 );
 
-// Index for efficient querying
+// Indexes for efficient querying
 taskSchema.index({ project: 1, status: 1 });
 taskSchema.index({ assignee: 1 });
 taskSchema.index({ deadline: 1 });
+taskSchema.index({ createdBy: 1 });
 
 // Virtual for checking if task is overdue
 taskSchema.virtual('isOverdue').get(function () {

@@ -1,3 +1,4 @@
+// frontend/src/components/NotificationBell.js - IMPROVED VERSION
 import React, { useState, useEffect, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
@@ -14,19 +15,30 @@ const NotificationBell = () => {
   const navigate = useNavigate();
   const { notifications, unreadCount } = useSelector((state) => state.notifications);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [isAnimating, setIsAnimating] = useState(false);
   const dropdownRef = useRef(null);
+  const prevUnreadCount = useRef(unreadCount);
 
   useEffect(() => {
     // Fetch unread count on mount
     dispatch(getUnreadCount());
 
-    // Poll for new notifications every 30 seconds
+    // Poll for new notifications every 15 seconds (more frequent)
     const interval = setInterval(() => {
       dispatch(getUnreadCount());
-    }, 30000);
+    }, 15000);
 
     return () => clearInterval(interval);
   }, [dispatch]);
+
+  // Animate bell when new notifications arrive
+  useEffect(() => {
+    if (unreadCount > prevUnreadCount.current && unreadCount > 0) {
+      setIsAnimating(true);
+      setTimeout(() => setIsAnimating(false), 1000);
+    }
+    prevUnreadCount.current = unreadCount;
+  }, [unreadCount]);
 
   useEffect(() => {
     // Fetch notifications when dropdown opens
@@ -113,9 +125,16 @@ const NotificationBell = () => {
       {/* Bell Icon */}
       <button
         onClick={() => setShowDropdown(!showDropdown)}
-        className="relative p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
+        className={`relative p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-all ${
+          isAnimating ? 'animate-bounce' : ''
+        }`}
       >
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg 
+          className={`w-6 h-6 ${isAnimating ? 'animate-wiggle' : ''}`} 
+          fill="none" 
+          stroke="currentColor" 
+          viewBox="0 0 24 24"
+        >
           <path
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -125,7 +144,7 @@ const NotificationBell = () => {
         </svg>
         {/* Badge */}
         {unreadCount > 0 && (
-          <span className="absolute top-0 right-0 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white transform translate-x-1/2 -translate-y-1/2 bg-red-600 rounded-full">
+          <span className="absolute top-0 right-0 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white transform translate-x-1/2 -translate-y-1/2 bg-red-600 rounded-full animate-pulse">
             {unreadCount > 99 ? '99+' : unreadCount}
           </span>
         )}
@@ -133,19 +152,26 @@ const NotificationBell = () => {
 
       {/* Dropdown */}
       {showDropdown && (
-        <div className="absolute right-0 mt-2 w-96 bg-white rounded-lg shadow-xl z-50 border border-gray-200 max-h-[600px] overflow-hidden flex flex-col">
+        <div 
+          className="absolute right-0 mt-2 w-96 bg-white rounded-lg shadow-xl z-50 border border-gray-200 max-h-[600px] overflow-hidden flex flex-col animate-slideDown"
+          style={{
+            animation: 'slideDown 0.2s ease-out'
+          }}
+        >
           {/* Header */}
-          <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-gray-800">
-              Notifications
+          <div className="p-4 border-b border-gray-200 flex items-center justify-between bg-gradient-to-r from-blue-50 to-purple-50">
+            <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+              🔔 Notifications
               {unreadCount > 0 && (
-                <span className="ml-2 text-sm text-gray-500">({unreadCount} new)</span>
+                <span className="ml-2 px-2 py-0.5 text-xs bg-red-100 text-red-600 rounded-full font-bold">
+                  {unreadCount} new
+                </span>
               )}
             </h3>
             {notifications.length > 0 && unreadCount > 0 && (
               <button
                 onClick={handleMarkAllRead}
-                className="text-xs text-primary-600 hover:text-primary-700 font-medium"
+                className="text-xs text-primary-600 hover:text-primary-700 font-medium px-3 py-1 rounded-full hover:bg-primary-50 transition-colors"
               >
                 Mark all read
               </button>
@@ -159,22 +185,22 @@ const NotificationBell = () => {
                 <div
                   key={notification._id}
                   onClick={() => handleNotificationClick(notification)}
-                  className={`p-4 border-b border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors ${
-                    !notification.isRead ? 'bg-blue-50' : ''
+                  className={`p-4 border-b border-gray-100 hover:bg-gradient-to-r hover:from-blue-50 hover:to-purple-50 cursor-pointer transition-all ${
+                    !notification.isRead ? 'bg-blue-50/50 border-l-4 border-l-blue-500' : ''
                   }`}
                 >
                   <div className="flex items-start gap-3">
-                    <span className="text-2xl flex-shrink-0">
+                    <span className="text-2xl flex-shrink-0 animate-fadeIn">
                       {getNotificationIcon(notification.type)}
                     </span>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
-                        <h4 className="font-medium text-gray-800 text-sm">
+                        <h4 className={`text-sm ${!notification.isRead ? 'font-semibold text-gray-900' : 'font-medium text-gray-800'}`}>
                           {notification.title}
                         </h4>
                         <button
                           onClick={(e) => handleDelete(e, notification._id)}
-                          className="text-gray-400 hover:text-red-600 flex-shrink-0"
+                          className="text-gray-400 hover:text-red-600 flex-shrink-0 transition-colors"
                         >
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -189,7 +215,7 @@ const NotificationBell = () => {
                           {formatTime(notification.createdAt)}
                         </span>
                         {!notification.isRead && (
-                          <span className="w-2 h-2 bg-blue-600 rounded-full"></span>
+                          <span className="w-2 h-2 bg-blue-600 rounded-full animate-pulse"></span>
                         )}
                       </div>
                     </div>
@@ -212,26 +238,63 @@ const NotificationBell = () => {
                   />
                 </svg>
                 <p>No notifications yet</p>
+                <p className="text-xs mt-1">We'll notify you when something happens</p>
               </div>
             )}
           </div>
 
           {/* Footer */}
           {notifications.length > 0 && (
-            <div className="p-3 border-t border-gray-200 text-center">
+            <div className="p-3 border-t border-gray-200 text-center bg-gray-50">
               <button
                 onClick={() => {
                   setShowDropdown(false);
                   navigate('/notifications');
                 }}
-                className="text-sm text-primary-600 hover:text-primary-700 font-medium"
+                className="text-sm text-primary-600 hover:text-primary-700 font-medium hover:underline"
               >
-                View all notifications
+                View all notifications →
               </button>
             </div>
           )}
         </div>
       )}
+
+      <style>{`
+        @keyframes slideDown {
+          from {
+            opacity: 0;
+            transform: translateY(-10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+
+        @keyframes wiggle {
+          0%, 100% { transform: rotate(0deg); }
+          25% { transform: rotate(-10deg); }
+          75% { transform: rotate(10deg); }
+        }
+
+        .animate-wiggle {
+          animation: wiggle 0.5s ease-in-out;
+        }
+
+        .animate-fadeIn {
+          animation: fadeIn 0.3s ease-in;
+        }
+
+        .animate-slideDown {
+          animation: slideDown 0.2s ease-out;
+        }
+      `}</style>
     </div>
   );
 };

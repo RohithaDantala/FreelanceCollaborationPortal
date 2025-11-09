@@ -25,7 +25,7 @@ const ProjectDetail = () => {
 
   const [applicationMessage, setApplicationMessage] = useState('');
   const [showApplicationModal, setShowApplicationModal] = useState(false);
-  const [resumeFile, setResumeFile] = useState(null);
+
   useEffect(() => {
     dispatch(getProject(id));
     return () => {
@@ -50,7 +50,6 @@ const ProjectDetail = () => {
   );
   
   const applicationStatus = myApplication?.status;
-
   const isRemoved = applicationStatus === 'removed';
   
   if (project && user && !isLoading && !isMember && !isOwner && isRemoved) {
@@ -82,42 +81,51 @@ const ProjectDetail = () => {
       await dispatch(applyToProject({ id: project._id, message: applicationMessage })).unwrap();
       setShowApplicationModal(false);
       setApplicationMessage('');
-      // Refresh project to get updated applicants
       dispatch(getProject(id));
     } catch (error) {
       alert(error || 'Failed to submit application');
     }
   };
 
-// Replace the handleAcceptReject function in your ProjectDetail.js (around line 107)
-
-const handleAcceptReject = async (applicantId, action) => {
-  // action will be 'approve' or 'reject'
-  const actionText = action === 'approve' ? 'approve' : 'reject';
-  
-  if (window.confirm(`Are you sure you want to ${actionText} this application?`)) {
-    try {
-      await dispatch(
-        handleApplication({ 
-          projectId: project._id, 
-          applicantId, 
-          action  // ✅ Send 'action' instead of 'status'
-        })
-      ).unwrap();
-      
-      // Force refresh to get updated data
-      await dispatch(getProject(project._id));
-    } catch (error) {
-      alert(error || 'Failed to handle application');
+  const handleAcceptReject = async (applicantId, action) => {
+    const actionText = action === 'approve' ? 'approve' : 'reject';
+    
+    if (window.confirm(`Are you sure you want to ${actionText} this application?`)) {
+      try {
+        console.log('🔄 Handling application:', { applicantId, action });
+        
+        const result = await dispatch(
+          handleApplication({ 
+            projectId: project._id, 
+            applicantId, 
+            action
+          })
+        ).unwrap();
+        
+        console.log('✅ Application handled:', result);
+        
+        // Wait a bit for backend to process
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Force refresh with full population
+        const refreshResult = await dispatch(getProject(project._id)).unwrap();
+        console.log('📊 Refreshed project data:', {
+          membersCount: refreshResult.members?.length,
+          members: refreshResult.members,
+          applicantsCount: refreshResult.applicants?.length
+        });
+        
+      } catch (error) {
+        console.error('❌ Error handling application:', error);
+        alert(error || 'Failed to handle application');
+      }
     }
-  }
-};
+  };
 
   const handleRemoveMember = async (memberId) => {
     if (window.confirm('Are you sure you want to remove this member?')) {
       try {
         await dispatch(removeMember({ projectId: project._id, memberId })).unwrap();
-        // Refresh project
         dispatch(getProject(project._id));
       } catch (error) {
         alert('Failed to remove member');
@@ -142,10 +150,15 @@ const handleAcceptReject = async (applicantId, action) => {
       data_science: 'Data Science',
       other: 'Other',
     };
-    return labels[category] || category;
+    return labels[category] || category || 'Other';
   };
 
   const getStatusBadge = (status) => {
+    // Handle undefined or null status
+    if (!status) {
+      return 'bg-gray-100 text-gray-800';
+    }
+    
     const badges = {
       open: 'bg-green-100 text-green-800',
       in_progress: 'bg-blue-100 text-blue-800',
@@ -153,6 +166,11 @@ const handleAcceptReject = async (applicantId, action) => {
       archived: 'bg-yellow-100 text-yellow-800',
     };
     return badges[status] || 'bg-gray-100 text-gray-800';
+  };
+
+  const getStatusText = (status) => {
+    if (!status) return 'unknown';
+    return status.replace('_', ' ');
   };
 
   if (isLoading) {
@@ -201,7 +219,7 @@ const handleAcceptReject = async (applicantId, action) => {
                       project?.status
                     )}`}
                   >
-                    {project?.status.replace('_', ' ')}
+                    {getStatusText(project?.status)}
                   </span>
                 </div>
                 <p className="text-gray-600 capitalize">{getCategoryLabel(project.category)}</p>
@@ -294,7 +312,7 @@ const handleAcceptReject = async (applicantId, action) => {
 
             {/* Project Owner */}
             <div className="flex items-center space-x-3 pt-4 border-t">
-              {project.owner.avatar ? (
+              {project.owner?.avatar ? (
                 <img
                   src={project.owner.avatar}
                   alt={project.owner.firstName}
@@ -303,14 +321,14 @@ const handleAcceptReject = async (applicantId, action) => {
               ) : (
                 <div className="w-12 h-12 bg-primary-100 rounded-full flex items-center justify-center">
                   <span className="text-primary-600 font-semibold">
-                    {project.owner.firstName?.charAt(0)}
-                    {project.owner.lastName?.charAt(0)}
+                    {project.owner?.firstName?.charAt(0) || '?'}
+                    {project.owner?.lastName?.charAt(0) || ''}
                   </span>
                 </div>
               )}
               <div>
                 <p className="font-medium text-gray-800">
-                  {project.owner.firstName} {project.owner.lastName}
+                  {project.owner?.firstName || 'Unknown'} {project.owner?.lastName || ''}
                 </p>
                 <p className="text-sm text-gray-500">Project Owner</p>
               </div>
@@ -343,85 +361,62 @@ const handleAcceptReject = async (applicantId, action) => {
                 </div>
               )}
 
-              {/* Milestones */}
-              {project.milestones && project.milestones.length > 0 && (
-                <div className="bg-white rounded-lg shadow-md p-6">
-                  <h2 className="text-xl font-semibold text-gray-800 mb-4">Milestones</h2>
-                  <div className="space-y-3">
-                    {project.milestones.map((milestone, index) => (
-                      <div key={index} className="p-4 border border-gray-200 rounded-lg">
-                        <div className="flex items-start justify-between mb-2">
-                          <h3 className="font-medium text-gray-800">{milestone.title}</h3>
-                          <span
-                            className={`px-2 py-1 text-xs rounded-full ${
-                              milestone.status === 'completed'
-                                ? 'bg-green-100 text-green-800'
-                                : milestone.status === 'in_progress'
-                                ? 'bg-blue-100 text-blue-800'
-                                : 'bg-gray-100 text-gray-800'
-                            }`}
-                          >
-                            {milestone.status}
-                          </span>
-                        </div>
-                        {milestone.description && (
-                          <p className="text-sm text-gray-600 mb-2">{milestone.description}</p>
-                        )}
-                        {milestone.dueDate && (
-                          <p className="text-sm text-gray-500">
-                            Due: {new Date(milestone.dueDate).toLocaleDateString()}
-                          </p>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
               {/* Team Members */}
               <div className="bg-white rounded-lg shadow-md p-6">
                 <h2 className="text-xl font-semibold text-gray-800 mb-4">
                   Team Members ({project.members?.length || 0}/{project.maxMembers})
                 </h2>
-                <div className="space-y-3">
-                  {project.members?.map((member) => (
-                    <div
-                      key={member._id}
-                      className="flex items-center justify-between p-3 border border-gray-200 rounded-lg"
-                    >
-                      <div className="flex items-center space-x-3">
-                        {member.user.avatar ? (
-                          <img
-                            src={member.user.avatar}
-                            alt={member.user.firstName}
-                            className="w-10 h-10 rounded-full"
-                          />
-                        ) : (
-                          <div className="w-10 h-10 bg-primary-100 rounded-full flex items-center justify-center">
-                            <span className="text-primary-600 text-sm font-semibold">
-                              {member.user.firstName?.charAt(0)}
-                              {member.user.lastName?.charAt(0)}
-                            </span>
-                          </div>
-                        )}
-                        <div>
-                          <p className="font-medium text-gray-800">
-                            {member.user.firstName} {member.user.lastName}
-                          </p>
-                          <p className="text-sm text-gray-500 capitalize">{member.role}</p>
-                        </div>
-                      </div>
-                      {isOwner && member.role !== 'owner' && (
-                        <button
-                          onClick={() => handleRemoveMember(member.user._id)}
-                          className="text-red-600 hover:text-red-700 text-sm"
+                {project.members && project.members.length > 0 ? (
+                  <div className="space-y-3">
+                    {project.members.map((member, index) => {
+                      // Handle both populated and non-populated user references
+                      const memberUser = typeof member.user === 'object' ? member.user : null;
+                      const memberUserId = typeof member.user === 'string' ? member.user : member.user?._id;
+                      
+                      return (
+                        <div
+                          key={member._id || `member-${index}`}
+                          className="flex items-center justify-between p-3 border border-gray-200 rounded-lg"
                         >
-                          Remove
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
+                          <div className="flex items-center space-x-3">
+                            {memberUser?.avatar ? (
+                              <img
+                                src={memberUser.avatar}
+                                alt={memberUser.firstName}
+                                className="w-10 h-10 rounded-full"
+                              />
+                            ) : (
+                              <div className="w-10 h-10 bg-primary-100 rounded-full flex items-center justify-center">
+                                <span className="text-primary-600 text-sm font-semibold">
+                                  {memberUser?.firstName?.charAt(0) || '?'}
+                                  {memberUser?.lastName?.charAt(0) || ''}
+                                </span>
+                              </div>
+                            )}
+                            <div>
+                              <p className="font-medium text-gray-800">
+                                {memberUser?.firstName || 'Loading...'} {memberUser?.lastName || ''}
+                              </p>
+                              <p className="text-sm text-gray-500 capitalize">{member.role}</p>
+                            </div>
+                          </div>
+                          {isOwner && member.role !== 'owner' && memberUserId && (
+                            <button
+                              onClick={() => handleRemoveMember(memberUserId)}
+                              className="text-red-600 hover:text-red-700 text-sm"
+                            >
+                              Remove
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-gray-500">
+                    <p>No team members yet</p>
+                  </div>
+                )}
               </div>
 
               {/* Comments Section */}
@@ -445,7 +440,7 @@ const handleAcceptReject = async (applicantId, action) => {
                         <div key={applicant._id} className="p-4 border border-yellow-200 bg-yellow-50 rounded-lg">
                           <div className="flex items-start justify-between mb-3">
                             <div className="flex items-center space-x-3">
-                              {applicant.user.avatar ? (
+                              {applicant.user?.avatar ? (
                                 <img
                                   src={applicant.user.avatar}
                                   alt={applicant.user.firstName}
@@ -454,14 +449,14 @@ const handleAcceptReject = async (applicantId, action) => {
                               ) : (
                                 <div className="w-10 h-10 bg-primary-100 rounded-full flex items-center justify-center">
                                   <span className="text-primary-600 text-sm font-semibold">
-                                    {applicant.user.firstName?.charAt(0)}
-                                    {applicant.user.lastName?.charAt(0)}
+                                    {applicant.user?.firstName?.charAt(0) || '?'}
+                                    {applicant.user?.lastName?.charAt(0) || ''}
                                   </span>
                                 </div>
                               )}
                               <div>
                                 <p className="font-medium text-gray-800">
-                                  {applicant.user.firstName} {applicant.user.lastName}
+                                  {applicant.user?.firstName || 'Unknown'} {applicant.user?.lastName || ''}
                                 </p>
                                 <p className="text-sm text-gray-500">
                                   Applied {new Date(applicant.appliedAt).toLocaleDateString()}
@@ -488,7 +483,7 @@ const handleAcceptReject = async (applicantId, action) => {
                               onClick={() => handleAcceptReject(applicant.user._id, 'reject')}
                               className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm"
                             >
-                              Reject
+                              ✗ Reject
                             </button>
                           </div>
                         </div>
@@ -498,52 +493,46 @@ const handleAcceptReject = async (applicantId, action) => {
               )}
             </div>
 
-              {/* Sidebar - Project Info */}
-              <div className="lg:col-span-1">
-                <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-                  <h2 className="text-lg font-semibold text-gray-800 mb-4">Project Details</h2>
-                  <div className="space-y-3">
-                    {project.budget && (project.budget.min > 0 || project.budget.max > 0) && (
-                      <div>
-                        <p className="text-sm text-gray-500">Budget</p>
-                        <p className="font-medium text-gray-800">
-                          ${project.budget.min} - ${project.budget.max} {project.budget.currency}
-                        </p>
-                      </div>
-                    )}
-                    {project.timeline?.estimatedDuration && (
-                      <div>
-                        <p className="text-sm text-gray-500">Duration</p>
-                        <p className="font-medium text-gray-800">
-                          {project.timeline.estimatedDuration}
-                        </p>
-                      </div>
-                    )}
+            {/* Sidebar */}
+            <div className="lg:col-span-1">
+              <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+                <h2 className="text-lg font-semibold text-gray-800 mb-4">Project Details</h2>
+                <div className="space-y-3">
+                  {project.budget && (project.budget.min > 0 || project.budget.max > 0) && (
                     <div>
-                      <p className="text-sm text-gray-500">Created</p>
+                      <p className="text-sm text-gray-500">Budget</p>
                       <p className="font-medium text-gray-800">
-                        {new Date(project.createdAt).toLocaleDateString()}
+                        ${project.budget.min} - ${project.budget.max} {project.budget.currency}
                       </p>
                     </div>
+                  )}
+                  {project.timeline?.estimatedDuration && (
                     <div>
-                      <p className="text-sm text-gray-500">Last Updated</p>
+                      <p className="text-sm text-gray-500">Duration</p>
                       <p className="font-medium text-gray-800">
-                        {new Date(project.updatedAt).toLocaleDateString()}
+                        {project.timeline.estimatedDuration}
                       </p>
                     </div>
+                  )}
+                  <div>
+                    <p className="text-sm text-gray-500">Created</p>
+                    <p className="font-medium text-gray-800">
+                      {new Date(project.createdAt).toLocaleDateString()}
+                    </p>
                   </div>
                 </div>
-
-                {/* ProjectChat Component - Only for members - FIXED: Sticky positioning */}
-                {isMember && (
-                  <div className="sticky top-4">
-                    <ProjectChat projectId={project._id} />
-                  </div>
-                )}
               </div>
+
+              {/* ProjectChat Component */}
+              {isMember && (
+                <div className="sticky top-4">
+                  <ProjectChat projectId={project._id} />
+                </div>
+              )}
             </div>
           </div>
         </div>
+      </div>
 
       {/* Application Modal */}
       {showApplicationModal && (
